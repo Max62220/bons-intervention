@@ -20,9 +20,22 @@ Ouvrir une première fois avec du réseau : ensuite l'application fonctionne hor
 
 ## Mise à jour
 
-Remplacer `index.html` sur GitHub, et changer `bi-v1` en `bi-v2` dans `sw.js`
+Remplacer `index.html` sur GitHub, et changer `bi-v2` en `bi-v3` dans `sw.js`
 pour forcer le rafraîchissement du cache sur les appareils.
 
 ## Numérotation
 
 `AAAAMMJJ-INITIALES-NNN` (NNN aléatoire, unicité vérifiée sur l'appareil).
+
+## Plusieurs techniciens
+
+- **config.json** : valeurs communes à tous (destinataire, Cc, entreprise par défaut, liste des
+  entreprises prestataires). Modifiable directement sur GitHub (icône crayon), pris en compte au
+  prochain lancement de l'appli. Ces valeurs ne servent que si le technicien n'a rien saisi lui-même.
+- **admin.html** (`…/bons-intervention/admin.html`) : le responsable remplit l'identité d'un technicien
+  et obtient un lien personnalisé (+ QR code) à envoyer par SMS ou e-mail. À l'ouverture, l'appli
+  affiche la configuration reçue et le technicien l'applique en un geste.
+  Le contenu du lien reste dans le navigateur (partie après #, jamais envoyée à GitHub).
+- iPhone : une appli installée sur l'écran d'accueil a son propre stockage, séparé de Safari.
+  Si le technicien a installé l'appli avant d'ouvrir le lien, il colle le lien dans
+  Réglages > Lien de configuration.

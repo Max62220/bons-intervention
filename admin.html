@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Configuration techniciens</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0b6e6e">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Poste du responsable : formulaire à gauche, lien + QR à droite (empilés sur mobile) */
+:root{
+  --bg:#eef2f3; --surface:#ffffff; --field:#f6f8f9; --ink:#14212b; --muted:#5b6a74; --line:#d3dbdf;
+  --accent:#0b6e6e; --accent-ink:#ffffff; --accent-soft:#dcefee; --err:#b42318;
+  --f-sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0e1518; --surface:#162026; --field:#1c2830; --ink:#e4ecef; --muted:#93a4ad; --line:#2a3943;
+  --accent:#3db3aa; --accent-ink:#04201e; --accent-soft:#163a38; --err:#ff8a7a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1518; --surface:#162026; --field:#1c2830; --ink:#e4ecef; --muted:#93a4ad; --line:#2a3943;
+  --accent:#3db3aa; --accent-ink:#04201e; --accent-soft:#163a38; --err:#ff8a7a; color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 var(--f-sans)}
+button,input{font:inherit;color:inherit}
+[hidden]{display:none!important}
+header{background:var(--surface);border-bottom:1px solid var(--line);padding:14px 16px}
+header div{max-width:1000px;margin:0 auto;display:flex;align-items:center;gap:10px}
+.mark{width:30px;height:30px;border-radius:7px;background:var(--accent);display:grid;place-items:center;color:var(--accent-ink);font:600 13px var(--f-mono);flex:none}
+header strong{font-size:16px}
+header a{margin-left:auto;color:var(--accent);font-size:14px}
+main{max-width:1000px;margin:0 auto;padding:16px;display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
+@media (min-width:860px){main{grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);align-items:start}}
+.col{display:flex;flex-direction:column;gap:14px;min-width:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:12px}
+h2{margin:0;font-size:11.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+label.f{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:500;min-width:0}
+.req{color:var(--err)}
+input[type=text],input[type=email]{width:100%;min-height:44px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--field);font-size:16px}
+input:focus-visible,button:focus-visible,a:focus-visible{outline:2.5px solid var(--accent);outline-offset:1px}
+.check{display:flex;gap:10px;align-items:center;font-size:14px}
+.check input{width:20px;height:20px;accent-color:var(--accent)}
+.hint{font-size:12.5px;color:var(--muted);margin:0}
+.btn{min-height:44px;padding:10px 16px;border-radius:8px;border:1px solid var(--line);background:var(--surface);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;text-decoration:none;color:var(--ink)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.small{min-height:34px;padding:5px 11px;font-size:13.5px}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+.link{font:500 13px var(--f-mono);overflow-wrap:anywhere;background:var(--field);border:1px solid var(--line);border-radius:8px;padding:9px 11px;user-select:all;max-height:7.5em;overflow:auto}
+.qr{align-self:center;background:#fff;padding:12px;border-radius:8px;border:1px solid var(--line);line-height:0}
+.qr img,.qr canvas{display:block;max-width:100%;height:auto}
+.empty{color:var(--muted);margin:0;font-size:14px}
+.list{display:flex;flex-direction:column;gap:6px}
+.item{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:8px}
+.item b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item span{display:block;font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ini{font:600 12px var(--f-mono);background:var(--accent-soft);color:var(--accent);border-radius:5px;padding:1px 6px;margin-right:6px}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:14px;max-width:calc(100% - 32px);opacity:0;pointer-events:none;transition:opacity .2s}
+#toast.show{opacity:1}
+@media (prefers-reduced-motion:reduce){#toast{transition:none}}
+</style>
+</head>
+<body>
+<header><div><span class="mark" aria-hidden="true">BI</span><strong>Configuration des techniciens</strong><a href="./">Ouvrir l'appli</a></div></header>
+<main>
+  <div class="col">
+    <div class="card">
+      <h2>Technicien</h2>
+      <div class="row">
+        <label class="f">Prénom <span class="req" aria-hidden="true">*</span><input type="text" id="prenom" autocomplete="off"></label>
+        <label class="f">Nom <span class="req" aria-hidden="true">*</span><input type="text" id="nom" autocomplete="off"></label>
+        <label class="f">Initiales<input type="text" id="ini" maxlength="4" style="text-transform:uppercase;font-family:var(--f-mono)"></label>
+      </div>
+      <label class="f">E-mail du technicien<input type="email" id="email" inputmode="email" autocomplete="off"></label>
+      <label class="check"><input type="checkbox" id="ccSelf"> Le mettre en copie de ses bons</label>
+    </div>
+    <div class="card">
+      <h2>Envoi des bons</h2>
+      <label class="f">Entreprise (prestataire) <span class="req" aria-hidden="true">*</span><input type="text" id="entreprise" list="entreprises" autocomplete="off"></label>
+      <label class="f">Destinataire des bons <span class="req" aria-hidden="true">*</span><input type="text" id="dest" inputmode="email" placeholder="bureau@exemple.fr, autre@exemple.fr"></label>
+      <label class="f">Copie (Cc)<input type="text" id="cc" inputmode="email"></label>
+      <p class="hint" id="confHint"></p>
+      <div class="btns"><button type="button" class="btn primary" id="gen">Créer le lien</button><button type="button" class="btn" id="clear">Nouveau technicien</button></div>
+      <p class="hint" id="err" style="color:var(--err)" hidden></p>
+    </div>
+    <div class="card">
+      <h2>Techniciens préparés sur ce poste</h2>
+      <div class="list" id="list"></div>
+    </div>
+  </div>
+  <div class="col">
+    <div class="card" id="out">
+      <h2>Lien à transmettre</h2>
+      <p class="hint" id="outEmpty">Remplissez le formulaire puis cliquez sur « Créer le lien ». Le technicien l'ouvre sur son téléphone : ses réglages se remplissent tout seuls.</p>
+      <div id="outBox" hidden style="display:flex;flex-direction:column;gap:12px">
+        <p style="margin:0"><strong id="outWho"></strong></p>
+        <div class="link" id="link"></div>
+        <div class="btns">
+          <button type="button" class="btn small" id="copy">Copier le lien</button>
+          <a class="btn small" id="sms" href="#">Envoyer par SMS</a>
+          <a class="btn small" id="mail" href="#">Envoyer par e-mail</a>
+        </div>
+        <div class="qr" id="qr" aria-label="QR code du lien"></div>
+        <p class="hint">Sur place, le technicien peut aussi scanner ce QR code avec l'appareil photo de son téléphone.</p>
+        <p class="hint">Sur iPhone, si l'appli est déjà installée sur l'écran d'accueil, il copie le lien et le colle dans Réglages &gt; Lien de configuration.</p>
+      </div>
+    </div>
+  </div>
+</main>
+<datalist id="entreprises"></datalist>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+const K = 'bi.admin.techs';
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const get = () => { try { return JSON.parse(localStorage.getItem(K)) || []; } catch(e){ return []; } };
+const put = l => { try { localStorage.setItem(K, JSON.stringify(l)); } catch(e){} };
+let tT; function toast(m){ const t = $('#toast'); t.textContent = m; t.className = 'show'; clearTimeout(tT); tT = setTimeout(() => t.className = '', 3000); }
+function initialsOf(p, n){ return ((p||'') + ' ' + (n||'')).normalize('NFD').replace(/[̀-ͯ]/g,'').split(/[\s\-']+/).filter(Boolean).map(x => x[0]).join('').toUpperCase().replace(/[^A-Z]/g,'').slice(0,4); }
+const emails = s => (s||'').split(/[,;\s]+/).filter(Boolean);
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const encode = o => btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const appUrl = new URL('./', location.href).href;
+
+let iniTouched = false;
+['#prenom','#nom'].forEach(s => $(s).addEventListener('input', () => { if(!iniTouched) $('#ini').value = initialsOf($('#prenom').value, $('#nom').value); }));
+$('#ini').addEventListener('input', e => { iniTouched = true; e.target.value = e.target.value.toUpperCase().replace(/[^A-Z]/g,''); });
+
+let CONF = {};
+fetch('config.json', { cache:'no-store' }).then(r => r.ok ? r.json() : {}).then(c => {
+  CONF = c || {};
+  $('#entreprises').innerHTML = (CONF.entreprises || []).map(x => '<option value="' + esc(x) + '">').join('');
+  if(!$('#dest').value && CONF.destinataire) $('#dest').value = CONF.destinataire;
+  if(!$('#cc').value && CONF.cc) $('#cc').value = CONF.cc;
+  if(!$('#entreprise').value && CONF.entreprise) $('#entreprise').value = CONF.entreprise;
+  $('#confHint').textContent = CONF.destinataire ? 'Valeurs par défaut reprises de config.json.' : '';
+}).catch(() => {});
+
+function read(){
+  return { v:1, prenom: $('#prenom').value.trim(), nom: $('#nom').value.trim(),
+    initiales: ($('#ini').value.trim() || initialsOf($('#prenom').value, $('#nom').value)).toUpperCase(),
+    email: $('#email').value.trim(), ccSelf: $('#ccSelf').checked,
+    entreprise: $('#entreprise').value.trim(), dest: $('#dest').value.trim(), cc: $('#cc').value.trim() };
+}
+function fill(o){
+  $('#prenom').value = o.prenom||''; $('#nom').value = o.nom||''; $('#ini').value = o.initiales||''; iniTouched = !!o.initiales;
+  $('#email').value = o.email||''; $('#ccSelf').checked = !!o.ccSelf; $('#entreprise').value = o.entreprise||'';
+  $('#dest').value = o.dest||''; $('#cc').value = o.cc||'';
+}
+function check(o){
+  const e = [];
+  if(!o.prenom || !o.nom) e.push('prénom et nom');
+  if(!o.entreprise) e.push('entreprise');
+  if(!emails(o.dest).length) e.push('destinataire');
+  const bad = [...emails(o.dest), ...emails(o.cc), ...(o.email ? [o.email] : [])].filter(a => !EMAIL_RE.test(a));
+  if(bad.length) e.push('adresse invalide : ' + bad.join(', '));
+  return e;
+}
+function render(o){
+  const link = appUrl + '#setup=' + encode(o), who = o.prenom + ' ' + o.nom;
+  $('#outEmpty').hidden = true; $('#outBox').hidden = false;
+  $('#outWho').textContent = who + ' · ' + o.entreprise;
+  $('#link').textContent = link;
+  const msg = 'Bonjour ' + o.prenom + ', voici le lien pour configurer l’appli des bons d’intervention : ' + link;
+  $('#sms').href = 'sms:?&body=' + encodeURIComponent(msg);
+  $('#mail').href = 'mailto:' + encodeURIComponent(o.email || '') + '?subject=' + encodeURIComponent('Configuration de l’appli Bons d’intervention') +
+    '&body=' + encodeURIComponent('Bonjour ' + o.prenom + ',\n\nOuvrez ce lien sur votre téléphone pour configurer l’appli :\n' + link + '\n\nPuis ajoutez-la à l’écran d’accueil.\n');
+  const q = $('#qr'); q.innerHTML = '';
+  if(window.QRCode) new QRCode(q, { text: link, width: 240, height: 240, colorDark:'#14212b', colorLight:'#ffffff', correctLevel: QRCode.CorrectLevel.M });
+  else q.hidden = true;
+}
+function renderList(){
+  const l = get();
+  $('#list').innerHTML = l.length ? l.map((o,i) => `<div class="item"><div style="min-width:0"><b><span class="ini" style="display:inline">${esc(o.initiales)}</span>${esc(o.prenom + ' ' + o.nom)}</b><span>${esc(o.entreprise)} · ${esc(o.dest)}</span></div>
+    <button type="button" class="btn small" data-open="${i}">Lien</button><button type="button" class="btn small" data-del="${i}" aria-label="Retirer">✕</button></div>`).join('')
+    : '<p class="empty">Aucun technicien pour l’instant. Cette liste reste sur ce poste uniquement.</p>';
+}
+$('#gen').onclick = () => {
+  const o = read(), e = check(o);
+  if(e.length){ $('#err').textContent = 'À compléter : ' + e.join(' ; ') + '.'; $('#err').hidden = false; return; }
+  $('#err').hidden = true;
+  const l = get().filter(x => !(x.prenom === o.prenom && x.nom === o.nom)); l.unshift(o); put(l);
+  render(o); renderList();
+  if(window.innerWidth < 860) $('#out').scrollIntoView({ behavior:'smooth' });
+};
+$('#clear').onclick = () => {
+  fill({ entreprise: $('#entreprise').value, dest: $('#dest').value, cc: $('#cc').value });
+  $('#outEmpty').hidden = false; $('#outBox').hidden = true; $('#prenom').focus();
+};
+$('#copy').onclick = () => {
+  const t = $('#link').textContent;
+  if(navigator.clipboard) navigator.clipboard.writeText(t).then(() => toast('Lien copié.'), () => toast('Sélectionnez le lien et copiez-le.'));
+  else toast('Sélectionnez le lien et copiez-le.');
+};
+$('#list').addEventListener('click', e => {
+  const o = e.target.closest('[data-open]'), d = e.target.closest('[data-del]'), l = get();
+  if(o){ fill(l[+o.dataset.open]); render(l[+o.dataset.open]); }
+  if(d){ l.splice(+d.dataset.del, 1); put(l); renderList(); }
+});
+renderList();
+</script>
+</body>
+</html>

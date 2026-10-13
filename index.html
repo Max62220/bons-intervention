@@ -255,6 +255,16 @@ dl.sum dd{margin:0;overflow-wrap:anywhere}
 
 <!-- ============ RÉGLAGES ============ -->
 <section id="view-settings" class="view" hidden>
+  <div class="card" id="setupCard" hidden style="border-color:var(--accent)">
+    <h2>Configuration reçue</h2>
+    <p style="margin:0" id="setupText"></p>
+    <dl class="sum" id="setupSum"></dl>
+    <p class="hint" id="setupWarn" hidden>Elle remplacera vos réglages actuels. Vos bons et votre historique sont conservés.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button type="button" class="btn primary" id="setupApply">Appliquer cette configuration</button>
+      <button type="button" class="btn" id="setupIgnore">Ignorer</button>
+    </div>
+  </div>
   <div class="card" id="firstRun" hidden style="border-color:var(--accent)">
     <p style="margin:0"><strong>Première utilisation.</strong> Renseignez votre identité : elle sert au numéro de bon et apparaît sur le PDF.</p>
   </div>
@@ -277,6 +287,12 @@ dl.sum dd{margin:0;overflow-wrap:anywhere}
   </div>
   <div class="bar">
     <button type="button" class="btn primary" id="sSave">Enregistrer</button>
+  </div>
+  <div class="card">
+    <h2>Lien de configuration</h2>
+    <p class="hint">Si votre responsable vous a envoyé un lien et que l'appli est installée sur l'écran d'accueil (iPhone), copiez le lien et collez-le ici.</p>
+    <label class="f">Lien ou code reçu<input type="text" id="s-import" autocomplete="off" spellcheck="false"></label>
+    <button type="button" class="btn small" id="sImport">Lire la configuration</button>
   </div>
   <div class="card">
     <h2>Données</h2>
@@ -325,7 +341,13 @@ const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 /* ---------- réglages / historique ---------- */
-const settings = () => store.get(K_SET, {});
+const K_CONF = 'bi.conf';
+let CONF = store.get(K_CONF, {});   // valeurs communes (config.json du dépôt)
+const rawSettings = () => store.get(K_SET, {});
+function settings(){
+  const s = rawSettings();
+  return { ...s, entreprise: s.entreprise || CONF.entreprise || '', dest: s.dest || CONF.destinataire || '', cc: s.cc || CONF.cc || '' };
+}
 const hist = () => store.get(K_HIST, []);
 function saveHist(list){ return store.set(K_HIST, list); }
 
@@ -680,19 +702,57 @@ let iniTouched = false;
 function updSample(){ $('#s-sample').textContent = today().replaceAll('-','') + '-' + ($('#s-ini').value.toUpperCase() || 'XX') + '-427'; }
 ['#s-prenom','#s-nom'].forEach(s => $(s).addEventListener('input', () => { if(!iniTouched) $('#s-ini').value = initialsOf($('#s-prenom').value, $('#s-nom').value); updSample(); }));
 $('#s-ini').addEventListener('input', e => { iniTouched = true; e.target.value = e.target.value.toUpperCase().replace(/[^A-Z]/g,''); updSample(); });
+function applySettings(s, replaceDefaults){
+  if(!store.set(K_SET, s)) return false;
+  const e = settings();
+  draft.tech = techOf(e);
+  draft.numero = rebuildNumero(draft.numero, draft.date, e.initiales);
+  if(replaceDefaults || !draft.entreprise) draft.entreprise = e.entreprise;
+  if(replaceDefaults || !draft.dest) draft.dest = e.dest;
+  if(replaceDefaults || !draft.cc) draft.cc = defaultCc(e);
+  saveDraft(true); updWho(); fillEntreprises(); return true;
+}
 $('#sSave').onclick = () => {
   const s = { prenom: $('#s-prenom').value.trim(), nom: $('#s-nom').value.trim(),
     initiales: ($('#s-ini').value.trim().toUpperCase() || initialsOf($('#s-prenom').value, $('#s-nom').value)),
     email: $('#s-email').value.trim(), ccSelf: $('#s-ccSelf').checked, entreprise: $('#s-entreprise').value.trim(),
     dest: $('#s-dest').value.trim(), cc: $('#s-cc').value.trim() };
   if(!s.prenom || !s.nom){ toast('Le prénom et le nom sont obligatoires.', true); return; }
-  if(!store.set(K_SET, s)) return;
-  draft.tech = techOf(s);
-  draft.numero = rebuildNumero(draft.numero, draft.date, s.initiales);
-  if(!draft.entreprise) draft.entreprise = s.entreprise;
-  if(!draft.dest) draft.dest = s.dest;
-  if(!draft.cc) draft.cc = defaultCc(s);
-  saveDraft(true); updWho(); fillEntreprises(); toast('Réglages enregistrés.'); show('form');
+  if(applySettings(s, false)){ toast('Réglages enregistrés.'); show('form'); }
+};
+
+/* lien de configuration : …/#setup=<code>  (le code ne quitte jamais l'appareil : un # n'est pas envoyé au serveur) */
+let pendingSetup = null;
+function decodeSetup(txt){
+  try {
+    let code = String(txt || '').trim(); const i = code.indexOf('setup='); if(i >= 0) code = code.slice(i + 6);
+    code = code.split(/[&\s]/)[0].replace(/-/g,'+').replace(/_/g,'/'); while(code.length % 4) code += '=';
+    const o = JSON.parse(decodeURIComponent(escape(atob(code))));
+    if(!o || !o.prenom || !o.nom) return null;
+    const keep = ['prenom','nom','initiales','email','entreprise','dest','cc'], s = {};
+    keep.forEach(k => s[k] = String(o[k] || '').trim().slice(0, 200));
+    s.initiales = (s.initiales || initialsOf(s.prenom, s.nom)).toUpperCase().replace(/[^A-Z]/g,'').slice(0,4);
+    s.ccSelf = !!o.ccSelf; return s;
+  } catch(e){ return null; }
+}
+function showSetup(s){
+  pendingSetup = s; const cur = rawSettings();
+  $('#setupText').textContent = 'Votre responsable a préparé vos réglages. Vérifiez-les puis appliquez-les.';
+  const rows = [['Technicien', s.prenom + ' ' + s.nom + ' (' + s.initiales + ')'], ['Entreprise', s.entreprise || '—'],
+    ['Destinataire', s.dest || '—'], ['Copie', s.cc || '—'], ['Mon e-mail', s.email ? s.email + (s.ccSelf ? ' (en copie)' : '') : '—']];
+  $('#setupSum').innerHTML = rows.map(([k,v]) => '<dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd>').join('');
+  $('#setupWarn').hidden = !cur.prenom; $('#setupCard').hidden = false;
+}
+function clearHash(){ try { history.replaceState(null, '', location.pathname + location.search); } catch(e){} }
+$('#setupApply').onclick = () => {
+  if(!pendingSetup) return;
+  if(applySettings(pendingSetup, true)){ pendingSetup = null; $('#setupCard').hidden = true; clearHash(); toast('Configuration appliquée.'); show('form'); }
+};
+$('#setupIgnore').onclick = () => { pendingSetup = null; $('#setupCard').hidden = true; clearHash(); };
+$('#sImport').onclick = () => {
+  const s = decodeSetup($('#s-import').value);
+  if(!s){ toast("Ce lien n'est pas un lien de configuration valide.", true); return; }
+  $('#s-import').value = ''; showSetup(s); window.scrollTo(0, 0);
 };
 let wipeArm = 0;
 $('#sWipe').onclick = e => {
@@ -701,7 +761,7 @@ $('#sWipe').onclick = e => {
 };
 function updWho(){ const s = settings(); $('#who').textContent = s.prenom ? s.prenom + ' ' + s.nom + (s.entreprise ? ' · ' + s.entreprise : '') : 'Technicien non renseigné'; }
 function fillEntreprises(){
-  const set = new Set([settings().entreprise, ...hist().map(b => b.entreprise)].filter(Boolean));
+  const set = new Set([settings().entreprise, ...(Array.isArray(CONF.entreprises) ? CONF.entreprises : []), ...hist().map(b => b.entreprise)].filter(Boolean));
   $('#entreprises').innerHTML = [...set].map(x => '<option value="' + esc(x) + '">').join('');
 }
 
@@ -719,7 +779,23 @@ document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => show(b.
 /* ---------- démarrage ---------- */
 draft = store.get(K_DRAFT, null) || blankDraft();
 updWho(); fillEntreprises();
-show(settings().prenom ? 'form' : 'settings');
+const hashSetup = location.hash.indexOf('setup=') >= 0 ? decodeSetup(location.hash) : null;
+show(hashSetup || !settings().prenom ? 'settings' : 'form');
+if(hashSetup) showSetup(hashSetup);
+else if(location.hash.indexOf('setup=') >= 0){ clearHash(); toast("Le lien de configuration est incomplet. Demandez-en un nouveau.", true); }
+
+// valeurs communes : config.json à la racine du dépôt (gardé en mémoire pour le hors ligne)
+fetch('config.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(c => {
+  if(!c || typeof c !== 'object') return;
+  CONF = c; store.set(K_CONF, c); fillEntreprises(); updWho();
+  const e = settings(); let changed = false;
+  if(draft.statut === 'brouillon'){
+    if(!draft.entreprise && e.entreprise){ draft.entreprise = e.entreprise; changed = true; }
+    if(!draft.dest && e.dest){ draft.dest = e.dest; changed = true; }
+    if(!draft.cc && defaultCc(e)){ draft.cc = defaultCc(e); changed = true; }
+  }
+  if(changed){ saveDraft(true); if(!$('#view-form').hidden) fillForm(); }
+}).catch(() => {});
 if('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>
 </body>
