@@ -1,5 +1,5 @@
 // Cache hors ligne : l'application fonctionne sans réseau après une première ouverture.
-const CACHE = 'bi-v2';
+const CACHE = 'bi-v3';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png',
   'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
@@ -19,8 +19,12 @@ self.addEventListener('fetch', e => {
   e.respondWith(
     isPage
       // page : réseau d'abord (pour recevoir les mises à jour), cache si hors ligne
-      ? fetch(e.request).then(r => { caches.open(CACHE).then(c => c.put('./index.html', r.clone())); return r; })
-          .catch(() => caches.match('./index.html'))
+      ? fetch(e.request).then(r => {
+          // ne mettre en cache que la page de l'appli, et seulement si elle a bien été servie
+          const path = new URL(e.request.url).pathname;
+          if (r.ok && (path.endsWith('/') || path.endsWith('/index.html'))) { const cp = r.clone(); caches.open(CACHE).then(c => c.put('./index.html', cp)); }
+          return r;
+        }).catch(() => caches.match(e.request).then(hit => hit || caches.match('./index.html')))
       // le reste : cache d'abord
       : caches.match(e.request).then(hit => hit || fetch(e.request).then(r => {
           if (r.ok || r.type === 'opaque') { const cp = r.clone(); caches.open(CACHE).then(c => c.put(e.request, cp)); }
