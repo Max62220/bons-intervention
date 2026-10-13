@@ -151,6 +151,10 @@ dl.sum dd{margin:0;overflow-wrap:anywhere}
       <label class="f">Client <span class="req" aria-hidden="true">*</span><input type="text" id="f-client" autocomplete="off"></label>
       <label class="f">Site / bâtiment<input type="text" id="f-site" autocomplete="off"></label>
     </div>
+    <div class="row">
+      <label class="f">Code client <span class="req" aria-hidden="true">*</span><input type="text" id="f-codeClient" inputmode="numeric" autocomplete="off" style="font-family:var(--f-mono)"></label>
+      <label class="f">Département <span class="req" aria-hidden="true">*</span><input type="text" id="f-departement" maxlength="3" inputmode="numeric" autocomplete="off" placeholder="59" style="font-family:var(--f-mono)"></label>
+    </div>
     <label class="f">Adresse<textarea id="f-adresse" rows="2" style="min-height:64px"></textarea></label>
     <div class="row">
       <label class="f">Contact sur place<input type="text" id="f-contact" autocomplete="off"></label>
@@ -164,8 +168,9 @@ dl.sum dd{margin:0;overflow-wrap:anywhere}
       <label class="f">Arrivée <span class="req" aria-hidden="true">*</span><input type="time" id="f-debut"></label>
       <label class="f">Départ <span class="req" aria-hidden="true">*</span><input type="time" id="f-fin"></label>
       <label class="f">Pause (min)<input type="number" id="f-pause" min="0" step="5" inputmode="numeric"></label>
+      <label class="f">Nb d'intervenants <span class="req" aria-hidden="true">*</span><input type="number" id="f-nbTech" min="1" max="20" step="1" inputmode="numeric"></label>
     </div>
-    <div class="duree"><span class="lbl">Temps facturable</span><output id="duree">—</output></div>
+    <div class="duree" style="flex-wrap:wrap"><span class="lbl">Temps sur place</span><output id="duree">—</output><span class="lbl" style="margin-left:auto">Main d'œuvre totale</span><output id="dureeMO">—</output></div>
   </div>
 
   <div class="card">
@@ -236,6 +241,7 @@ dl.sum dd{margin:0;overflow-wrap:anywhere}
       <button type="button" class="btn primary" id="aShare" hidden disabled>Envoyer avec mon application e-mail</button>
       <button type="button" class="btn" id="aEml" disabled>Ouvrir un brouillon dans Outlook (.eml)</button>
       <button type="button" class="btn" id="aPdf" disabled>Télécharger le PDF</button>
+      <button type="button" class="btn small" id="aJson">Télécharger les données du bon (.json)</button>
       <button type="button" class="btn small" id="aCopy">Copier les destinataires</button>
       <a class="btn link" id="aMailto" href="#">E-mail sans pièce jointe (dernier recours)</a>
     </div>
@@ -361,12 +367,12 @@ function defaultCc(s){ const l = emails(s.cc); if(s.ccSelf && s.email && !l.incl
 function techOf(s){ return { prenom: s.prenom||'', nom: s.nom||'', initiales: s.initiales||'', email: s.email||'' }; }
 
 /* ---------- brouillon ---------- */
-const FIELDS = ['entreprise','date','client','site','adresse','contact','clientEmail','debut','fin','pause','objet','travaux','obs','dest','cc','signNom'];
+const FIELDS = ['entreprise','date','client','codeClient','departement','nbTech','site','adresse','contact','clientEmail','debut','fin','pause','objet','travaux','obs','dest','cc','signNom'];
 let draft;
 function blankDraft(){
   const s = settings(), date = today();
   return { numero: newNumero(date, s.initiales), statut:'brouillon', entreprise: s.entreprise||'', date,
-    client:'', site:'', adresse:'', contact:'', clientEmail:'', debut:'', fin:'', pause:'0', objet:'', travaux:'', obs:'',
+    client:'', codeClient:'', departement:'', nbTech:'1', site:'', adresse:'', contact:'', clientEmail:'', debut:'', fin:'', pause:'0', objet:'', travaux:'', obs:'',
     dest: s.dest||'', cc: defaultCc(s), sendClient:false, materiel:[], photos:[], signature:null, signNom:'',
     tech: techOf(s), createdAt: Date.now() };
 }
@@ -381,7 +387,12 @@ function fillForm(){
   $('#techLine').textContent = t.prenom ? 'Technicien : ' + t.prenom + ' ' + t.nom + ' (' + t.initiales + ')' : 'Renseignez votre nom dans Réglages.';
   updDuree(); renderMat(); renderPhotos(); sigRestore();
 }
-function updDuree(){ $('#duree').textContent = fmtDuree(dureeMin(draft.debut, draft.fin, draft.pause)); }
+const nbOf = b => Math.max(1, parseInt(b.nbTech, 10) || 1);
+function updDuree(){
+  const d = dureeMin(draft.debut, draft.fin, draft.pause), n = nbOf(draft);
+  $('#duree').textContent = fmtDuree(d);
+  $('#dureeMO').textContent = d == null ? '—' : (n > 1 ? n + ' × ' : '') + fmtDuree(d) + (n > 1 ? ' = ' + fmtDuree(d * n) : '');
+}
 
 $('#view-form').addEventListener('input', e => {
   const el = e.target;
@@ -391,7 +402,7 @@ $('#view-form').addEventListener('input', e => {
     else if(FIELDS.includes(k)){
       draft[k] = el.value;
       if(k === 'date' && el.value){ draft.numero = rebuildNumero(draft.numero, el.value, draft.tech.initiales); $('#numero').textContent = draft.numero; }
-      if(k === 'debut' || k === 'fin' || k === 'pause') updDuree();
+      if(k === 'debut' || k === 'fin' || k === 'pause' || k === 'nbTech') updDuree();
     }
     saveDraft();
   } else if(el.dataset.i != null){
@@ -495,7 +506,7 @@ function recipients(b){
 function check(){
   const err = [];
   if(!draft.tech.prenom || !draft.tech.nom) err.push('votre prénom et votre nom (onglet Réglages)');
-  const need = [['entreprise',"l'entreprise de l'intervenant"],['date',"la date d'intervention"],['client','le nom du client'],
+  const need = [['entreprise',"l'entreprise de l'intervenant"],['date',"la date d'intervention"],['client','le nom du client'],['codeClient','le code client'],['departement','le département'],
     ['debut',"l'heure d'arrivée"],['fin','l’heure de départ'],['travaux','les travaux réalisés'],['signNom','le nom du signataire']];
   need.forEach(([k, l]) => { if(!String(draft[k]||'').trim()) err.push(l); });
   const {to, cc} = recipients(draft);
@@ -503,6 +514,8 @@ function check(){
   [...to, ...cc].filter(a => !EMAIL_RE.test(a)).forEach(a => err.push('une adresse valide à la place de « ' + a + ' »'));
   if(draft.sendClient && !draft.clientEmail) err.push("l'e-mail du client (case « Envoyer aussi au client » cochée)");
   draft.materiel.forEach((m,i) => { if(!m.ref.trim() && !m.des.trim()) err.push('la référence de la pièce n° ' + (i+1) + ' (ou supprimez la ligne)'); });
+  if(draft.departement && !/^(\d{2,3}|2[AB])$/i.test(draft.departement.trim())) err.push('un département valide (ex. 59, 2A, 971)');
+  if(!(parseInt(draft.nbTech, 10) >= 1)) err.push("le nombre d'intervenants (1 minimum)");
   if(!draft.signature) err.push('la signature du client');
   return err;
 }
@@ -545,14 +558,15 @@ function buildPdf(b){
     head: [[{content:'Intervenant', colSpan:2}, {content:'Client', colSpan:2}]],
     body: [
       ['Entreprise', b.entreprise, 'Client', b.client],
-      ['Technicien', t.prenom + ' ' + t.nom, 'Site', b.site || '-'],
+      ['Technicien', t.prenom + ' ' + t.nom, 'Code client', (b.codeClient || '-') + (b.departement ? '  (dépt ' + b.departement + ')' : '')],
+      ['Intervenants', String(nbOf(b)), 'Site', b.site || '-'],
       ['E-mail', t.email || '-', 'Adresse', b.adresse || '-'],
       ['', '', 'Contact', b.contact || '-'] ],
-    columnStyles:{ 0:{fontStyle:'bold', textColor:MUT, cellWidth:23}, 1:{cellWidth:62}, 2:{fontStyle:'bold', textColor:MUT, cellWidth:20} } });
+    columnStyles:{ 0:{fontStyle:'bold', textColor:MUT, cellWidth:24}, 1:{cellWidth:60}, 2:{fontStyle:'bold', textColor:MUT, cellWidth:23} } });
   doc.autoTable({ ...base, startY: next(),
-    head: [['Date','Arrivée','Départ','Pause','Temps passé']],
-    body: [[fmtDate(b.date), b.debut, b.fin, (Number(b.pause)||0) + ' min', fmtDuree(b.duree)]],
-    styles:{ ...base.styles, halign:'center' }, columnStyles:{ 4:{fontStyle:'bold'} } });
+    head: [['Date','Arrivée','Départ','Pause','Temps sur place','Intervenants','Main d\u2019oeuvre']],
+    body: [[fmtDate(b.date), b.debut, b.fin, (Number(b.pause)||0) + ' min', fmtDuree(b.duree), String(nbOf(b)), fmtDuree(b.duree * nbOf(b))]],
+    styles:{ ...base.styles, halign:'center' }, columnStyles:{ 6:{fontStyle:'bold'} } });
   doc.autoTable({ ...base, startY: next(),
     head: [['Travaux réalisés' + (b.objet ? '  -  ' + b.objet : '')]], body: [[b.travaux]] });
   doc.autoTable({ ...base, startY: next(),
@@ -587,7 +601,7 @@ function buildPdf(b){
   const n = doc.getNumberOfPages();
   for(let i = 1; i <= n; i++){
     doc.setPage(i); doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...MUT);
-    doc.text('Bon N° ' + b.numero + '  -  ' + b.client, M, 292); doc.text('Page ' + i + ' / ' + n, W-M, 292, {align:'right'});
+    doc.text('Bon N° ' + b.numero + '  -  ' + b.client + (b.codeClient ? ' (' + b.codeClient + ')' : ''), M, 292); doc.text('Page ' + i + ' / ' + n, W-M, 292, {align:'right'});
   }
   return doc.output('blob');
 }
@@ -598,13 +612,30 @@ const encH = s => /^[\x20-\x7e]*$/.test(s) ? s : '=?UTF-8?B?' + b64u(s) + '?=';
 const wrap76 = s => s.replace(/(.{76})/g, '$1\r\n');
 function blobB64(blob){ return new Promise(res => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.readAsDataURL(blob); }); }
 function fileName(b){ return 'BI_' + b.numero + '_' + (b.client||'').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Za-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40) + '.pdf'; }
+function dataOf(b){
+  const t = b.tech, d = b.duree || 0, n = nbOf(b), h = x => Math.round(x / 60 * 100) / 100;
+  return {
+    type: 'bon-intervention', version: 1,
+    numero: b.numero, date: b.date, valideLe: new Date(b.validatedAt).toISOString(),
+    entreprise: b.entreprise, technicien: (t.prenom + ' ' + t.nom).trim(), initialesTechnicien: t.initiales, emailTechnicien: t.email,
+    departement: String(b.departement || '').trim().toUpperCase(), codeClient: String(b.codeClient || '').trim(),
+    client: b.client, site: b.site, adresse: b.adresse, contact: b.contact, emailClient: b.clientEmail,
+    objet: b.objet, travaux: b.travaux, observations: b.obs,
+    arrivee: b.debut, depart: b.fin, pauseMin: Number(b.pause) || 0,
+    heuresSurPlace: h(d), nbIntervenants: n, heuresMainOeuvre: h(d * n),
+    signataire: b.signNom,
+    materiel: b.materiel.map(m => ({ reference: String(m.ref || '').trim(), designation: String(m.des || '').trim(), quantite: Number(String(m.qte).replace(',', '.')) || 0 }))
+  };
+}
+const jsonName = b => fileName(b).replace(/\.pdf$/, '.json');
+const jsonBlob = b => new Blob([JSON.stringify(dataOf(b), null, 2)], { type: 'application/json' });
 function subjectOf(b){ return "Bon d'intervention " + b.numero + ' - ' + b.client; }
 function bodyOf(b){
   const t = b.tech, mat = b.materiel.length;
   return 'Bonjour,\n\nVeuillez trouver ci-joint le bon d’intervention N° ' + b.numero + ' du ' + fmtDate(b.date) + '.\n\n' +
-    'Client : ' + b.client + (b.site ? ' (' + b.site + ')' : '') + '\n' +
+    'Client : ' + b.client + (b.codeClient ? ' - code ' + b.codeClient : '') + (b.site ? ' (' + b.site + ')' : '') + '\n' +
     'Horaires : ' + b.debut + ' - ' + b.fin + (Number(b.pause) ? ', pause ' + b.pause + ' min' : '') + '\n' +
-    'Temps passé : ' + fmtDuree(b.duree) + '\n' +
+    'Temps passé : ' + fmtDuree(b.duree) + (nbOf(b) > 1 ? ' x ' + nbOf(b) + ' intervenants = ' + fmtDuree(b.duree * nbOf(b)) : '') + '\n' +
     'Matériel remplacé : ' + (mat ? mat + ' ligne' + (mat > 1 ? 's' : '') : 'aucun') + '\n' +
     'Signé par : ' + b.signNom + '\n\nCordialement,\n' + t.prenom + ' ' + t.nom + '\n' + b.entreprise;
 }
@@ -616,7 +647,9 @@ async function buildEml(b, pdf){
     '--' + bd, 'Content-Type: text/plain; charset="utf-8"', 'Content-Transfer-Encoding: base64', '',
     wrap76(b64u(bodyOf(b).replace(/\n/g, '\r\n'))),
     '--' + bd, 'Content-Type: application/pdf; name="' + fn + '"', 'Content-Transfer-Encoding: base64',
-    'Content-Disposition: attachment; filename="' + fn + '"', '', wrap76(await blobB64(pdf)), '--' + bd + '--', '');
+    'Content-Disposition: attachment; filename="' + fn + '"', '', wrap76(await blobB64(pdf)),
+    '--' + bd, 'Content-Type: application/json; name="' + jsonName(b) + '"', 'Content-Transfer-Encoding: base64',
+    'Content-Disposition: attachment; filename="' + jsonName(b) + '"', '', wrap76(await blobB64(jsonBlob(b))), '--' + bd + '--', '');
   return new Blob([L.join('\r\n')], { type: 'message/rfc822' });
 }
 function download(blob, name){
@@ -638,8 +671,8 @@ function showRecap(num){
   curPdf = null; show('recap');
   const b = cur, {to, cc} = recipients(b), [pc, pl] = pillOf(b);
   $('#r-num').textContent = b.numero; const p = $('#r-pill'); p.className = 'pill ' + pc; p.textContent = pl;
-  const rows = [['Client', b.client + (b.site ? ' · ' + b.site : '')], ['Date', fmtDate(b.date)], ['Horaires', b.debut + ' – ' + b.fin + (Number(b.pause) ? ' (pause ' + b.pause + ' min)' : '')],
-    ['Temps passé', fmtDuree(b.duree)], ['Matériel', b.materiel.length ? b.materiel.map(m => (m.qte||'') + ' × ' + (m.ref||'') + ' ' + (m.des||'')).join('\n') : 'Aucun'],
+  const rows = [['Client', b.client + (b.site ? ' · ' + b.site : '')], ['Code client', (b.codeClient || '—') + (b.departement ? ' · dépt ' + b.departement : '')], ['Date', fmtDate(b.date)], ['Horaires', b.debut + ' – ' + b.fin + (Number(b.pause) ? ' (pause ' + b.pause + ' min)' : '')],
+    ['Temps passé', fmtDuree(b.duree) + (nbOf(b) > 1 ? ' × ' + nbOf(b) + ' intervenants = ' + fmtDuree(b.duree * nbOf(b)) : '')], ['Matériel', b.materiel.length ? b.materiel.map(m => (m.qte||'') + ' × ' + (m.ref||'') + ' ' + (m.des||'')).join('\n') : 'Aucun'],
     ['Photos', String(b.photos.length)], ['Entreprise', b.entreprise], ['Signé par', b.signNom]];
   $('#r-sum').innerHTML = rows.map(([k,v]) => '<dt>' + esc(k) + '</dt><dd style="white-space:pre-line">' + esc(v) + '</dd>').join('');
   $('#r-to').textContent = to.join(', '); $('#r-cc').textContent = cc.join(', '); $('#r-ccwrap').hidden = !cc.length;
@@ -669,13 +702,15 @@ function markSent(){
 $('#aShare').onclick = () => {
   if(!curPdf) return; const b = cur, {to, cc} = recipients(b);
   copyText(to.join(', ') + (cc.length ? ', ' + cc.join(', ') : ''));
-  const file = new File([curPdf], fileName(b), { type:'application/pdf' });
-  navigator.share({ files:[file], title: subjectOf(b), text: bodyOf(b) })
+  let files = [new File([curPdf], fileName(b), { type:'application/pdf' }), new File([jsonBlob(b)], jsonName(b), { type:'application/json' })];
+  try { if(!navigator.canShare({ files })) files = files.slice(0, 1); } catch(e){ files = files.slice(0, 1); }
+  navigator.share({ files, title: subjectOf(b), text: bodyOf(b) })
     .then(() => { markSent(); toast('Bon transmis à votre application e-mail.'); })
     .catch(err => { if(err && err.name !== 'AbortError') toast('Le partage a échoué : ' + err.message, true); });
 };
 $('#aEml').onclick = async () => { if(!curPdf) return; download(await buildEml(cur, curPdf), fileName(cur).replace(/\.pdf$/, '.eml')); toast('Ouvrez le fichier .eml téléchargé : le message est prêt.'); };
 $('#aPdf').onclick = () => { if(curPdf) download(curPdf, fileName(cur)); };
+$('#aJson').onclick = () => { if(cur) download(jsonBlob(cur), jsonName(cur)); };
 $('#aCopy').onclick = () => { const {to, cc} = recipients(cur); copyText(to.concat(cc).join(', ')).then(ok => toast(ok ? 'Adresses copiées.' : 'Copie impossible : sélectionnez les adresses à la main.', !ok)); };
 $('#aSent').onclick = () => { markSent(); toast('Bon marqué comme envoyé.'); };
 $('#aNew').onclick = () => show('form');

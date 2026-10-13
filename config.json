@@ -1,9 +1,9 @@
 {
-  "destinataire": "matthieu.delecroix@equans.com",
+  "destinataire": "",
   "cc": "",
-  "entreprise": "CocaCola","Client2","Client3",
+  "entreprise": "",
   "entreprises": [
-    "HPV",
-    "SETIA"
+    "Prestataire A",
+    "Prestataire B"
   ]
 }
