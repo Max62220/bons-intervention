@@ -1,5 +1,5 @@
 // Cache hors ligne : l'application fonctionne sans réseau après une première ouverture.
-const CACHE = 'bi-v9';
+const CACHE = 'bi-v10';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png',
   'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',

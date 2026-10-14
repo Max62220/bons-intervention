@@ -145,6 +145,7 @@ dl.sum dd{margin:0;overflow-wrap:anywhere}
       <label class="f">Client <span class="req" aria-hidden="true">*</span><input type="text" id="f-client" list="clientsList" autocomplete="off" placeholder="Tapez le nom ou le code client"></label>
       <label class="f">Site / bâtiment<input type="text" id="f-site" autocomplete="off"></label>
     </div>
+    <p class="hint" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span id="clientHint"></span><button type="button" class="btn small" id="clRefresh">Actualiser la liste</button></p>
     <div class="row">
       <label class="f">Code client <span class="req" aria-hidden="true">*</span><input type="text" id="f-codeClient" inputmode="numeric" autocomplete="off" style="font-family:var(--f-mono)"></label>
       <label class="f">Département <span class="req" aria-hidden="true">*</span><input type="text" id="f-departement" maxlength="3" inputmode="numeric" autocomplete="off" placeholder="59" style="font-family:var(--f-mono)"></label>
@@ -679,16 +680,40 @@ $('#aNew').onclick = () => { store.set('bi.showRecap', false); show('form'); };
 const K_CL = 'bi.clients';
 let CLIENTS = store.get(K_CL, []);
 const unb64u = t => { t = t.replace(/-/g,'+').replace(/_/g,'/'); while(t.length % 4) t += '='; return Uint8Array.from(atob(t), c => c.charCodeAt(0)); };
+// dépôt déduit de l'adresse https://<compte>.github.io/<depot>/ : lecture via l'API GitHub (fraîche), sinon via le site (cache ~10 min)
+const REPO = /\.github\.io$/.test(location.hostname) ? location.hostname.split('.')[0] + '/' + (location.pathname.split('/')[1] || '') : '';
+let clState = { ok: CLIENTS.length > 0, msg: '' };
+async function fetchClientsFile(){
+  if(REPO){
+    try {
+      const r = await fetch('https://api.github.com/repos/' + REPO + '/contents/sauvegarde/clients.enc', { cache:'no-store', headers:{ 'Accept':'application/vnd.github.raw+json' } });
+      if(r.ok) return await r.json();
+    } catch(e){}
+  }
+  const r = await fetch('sauvegarde/clients.enc?t=' + Date.now(), { cache:'no-store' });
+  if(r.status === 404) throw new Error('none');
+  if(!r.ok) throw new Error('net');
+  return r.json();
+}
 async function loadClients(){
-  const k = rawSettings().ck; if(!k || !window.crypto || !crypto.subtle) return;
+  const k = rawSettings().ck;
+  if(!k){ clState = { ok:false, msg:"Liste des clients indisponible : votre lien ne contient pas la clé. Demandez un nouveau lien à votre responsable." }; showClState(); return; }
+  if(!window.crypto || !crypto.subtle){ clState = { ok:false, msg:'Liste des clients indisponible sur ce navigateur.' }; showClState(); return; }
+  let o;
+  try { o = await fetchClientsFile(); }
+  catch(e){ clState = { ok: CLIENTS.length > 0, msg: e.message === 'none' ? 'Aucune liste de clients publiée pour le moment.' : (CLIENTS.length ? 'Hors ligne : dernière liste reçue (' + CLIENTS.length + ' clients).' : 'Liste des clients injoignable (réseau).') }; showClState(); return; }
   try {
-    const r = await fetch('sauvegarde/clients.enc', { cache:'no-store' }); if(!r.ok) return;
-    const o = await r.json();
     const key = await crypto.subtle.importKey('raw', unb64u(k), 'AES-GCM', false, ['decrypt']);
     const pt = await crypto.subtle.decrypt({ name:'AES-GCM', iv: unb64u(o.iv) }, key, unb64u(o.data));
     CLIENTS = JSON.parse(new TextDecoder().decode(pt)); store.set(K_CL, CLIENTS);
-  } catch(e){ /* hors ligne ou clé obsolète : on garde la dernière liste reçue */ }
+    const d = o.date ? new Date(o.date) : null;
+    clState = { ok:true, msg: CLIENTS.length + ' client(s) disponible(s)' + (d ? ', liste du ' + d.toLocaleDateString('fr-FR') + ' à ' + d.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' }) : '') + '.' };
+  } catch(e){ clState = { ok:false, msg:"Liste des clients illisible : la clé de votre lien n'est plus la bonne. Demandez un nouveau lien à votre responsable." }; }
+  showClState();
 }
+function showClState(){ const h = $('#clientHint'); if(!h) return; h.textContent = clState.msg; h.style.color = clState.ok ? '' : 'var(--err)'; }
+$('#clRefresh') && ($('#clRefresh').onclick = () => { $('#clientHint').textContent = 'Mise à jour de la liste…'; loadClients().then(() => suggestClients($('#f-client').value)); });
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible' && configured()) loadClients(); });
 const cliLabel = c => c.nom + (c.code ? ' — ' + c.code : '') + (c.ville || c.site ? ' — ' + [c.site, c.ville].filter(Boolean).join(', ') : '');
 function suggestClients(q){
   q = q.trim().toLowerCase();
