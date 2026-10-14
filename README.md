@@ -20,7 +20,7 @@ Ouvrir une première fois avec du réseau : ensuite l'application fonctionne hor
 
 ## Mise à jour
 
-Remplacer `index.html` sur GitHub, et changer `bi-v6` en `bi-v7` dans `sw.js`
+Remplacer `index.html` sur GitHub, et changer `bi-v7` en `bi-v8` dans `sw.js`
 pour forcer le rafraîchissement du cache sur les appareils.
 
 ## Numérotation
@@ -40,3 +40,15 @@ pour forcer le rafraîchissement du cache sur les appareils.
   Si le technicien a installé l'appli avant d'ouvrir le lien, il colle le lien dans
   l'écran « Accès réservé ».
 - Sans lien de configuration, l'appli affiche « Accès réservé » et ne permet pas de créer de bon.
+
+## Sauvegarde chiffrée de la liste des techniciens (page admin)
+
+La liste est chiffrée dans le navigateur (AES-GCM 256, clé PBKDF2-SHA256 310 000 itérations)
+puis écrite dans ce dépôt : `sauvegarde/techniciens.enc`. Le fichier est public mais illisible
+sans le mot de passe, qui n'est jamais stocké (oubli = sauvegarde irrécupérable).
+
+Jeton : GitHub > Settings > Developer settings > Personal access tokens > **Fine-grained tokens** :
+- Repository access : **Only select repositories** > ce dépôt uniquement ;
+- Permissions > Repository > **Contents : Read and write** ;
+- Expiration : la plus longue proposée (à renouveler ensuite).
+Ce jeton permet de modifier le dépôt : ne l'utiliser que sur le poste du responsable.

@@ -91,6 +91,22 @@ input:focus-visible,button:focus-visible,a:focus-visible{outline:2.5px solid var
       <h2>Techniciens préparés sur ce poste</h2>
       <div class="list" id="list"></div>
     </div>
+    <div class="card" id="bk">
+      <h2>Sauvegarde chiffrée sur GitHub <span id="bkState" class="ini" style="display:inline"></span></h2>
+      <p class="hint" id="bkInfo">La liste est chiffrée sur ce poste avec votre mot de passe, puis enregistrée automatiquement dans le dépôt GitHub de l'appli (fichier sauvegarde/techniciens.enc) à chaque modification. Le fichier est visible publiquement mais illisible sans le mot de passe.</p>
+      <div id="bkSetup" style="display:flex;flex-direction:column;gap:12px">
+        <label class="f">Dépôt GitHub de l'appli<input type="text" id="bkRepo" autocomplete="off" spellcheck="false" placeholder="compte/bons-intervention"></label>
+        <label class="f">Jeton d'accès GitHub<input type="password" id="bkToken" autocomplete="off" spellcheck="false" placeholder="github_pat_…"></label>
+      </div>
+      <label class="f">Mot de passe de chiffrement<input type="password" id="bkPass" autocomplete="new-password" placeholder="une phrase de 4 ou 5 mots"></label>
+      <p class="hint">Le mot de passe n'est jamais enregistré ni envoyé : il est redemandé à chaque ouverture de la page. Sans lui, la sauvegarde est illisible, y compris pour vous.</p>
+      <div class="btns">
+        <button type="button" class="btn primary" id="bkUnlock">Activer la sauvegarde</button>
+        <button type="button" class="btn" id="bkRestore">Restaurer depuis GitHub</button>
+        <button type="button" class="btn small" id="bkEdit">Modifier dépôt / jeton</button>
+      </div>
+      <p class="hint" id="bkMsg"></p>
+    </div>
   </div>
   <div class="col">
     <div class="card" id="out">
@@ -123,7 +139,7 @@ const $ = s => document.querySelector(s);
 const K = 'bi.admin.techs';
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const get = () => { try { return JSON.parse(localStorage.getItem(K)) || []; } catch(e){ return []; } };
-const put = l => { try { localStorage.setItem(K, JSON.stringify(l)); } catch(e){} };
+const put = l => { try { localStorage.setItem(K, JSON.stringify(l)); } catch(e){} backupSoon(); };
 let tT; function toast(m){ const t = $('#toast'); t.textContent = m; t.className = 'show'; clearTimeout(tT); tT = setTimeout(() => t.className = '', 3000); }
 function initialsOf(p, n){ return ((p||'') + ' ' + (n||'')).normalize('NFD').replace(/[̀-ͯ]/g,'').split(/[\s\-']+/).filter(Boolean).map(x => x[0]).join('').toUpperCase().replace(/[^A-Z]/g,'').slice(0,4); }
 const emails = s => (s||'').split(/[,;\s]+/).filter(Boolean);
@@ -208,6 +224,116 @@ $('#list').addEventListener('click', e => {
   if(d){ l.splice(+d.dataset.del, 1); put(l); renderList(); }
 });
 renderList();
+
+/* ---------- sauvegarde chiffrée (AES-GCM 256, clé PBKDF2-SHA256) dans un dépôt GitHub privé ---------- */
+const BK = 'bi.admin.backup', FILE = 'sauvegarde/techniciens.enc';
+// dépôt déduit de l'adresse : https://<compte>.github.io/<depot>/admin.html
+const repoGuess = () => /\.github\.io$/.test(location.hostname) ? location.hostname.split('.')[0] + '/' + (location.pathname.split('/')[1] || '') : '';
+const bkCfg = () => { try { return JSON.parse(localStorage.getItem(BK)) || {}; } catch(e){ return {}; } };
+const bkSave = c => { try { localStorage.setItem(BK, JSON.stringify(c)); } catch(e){} };
+let bkKeyPass = null, bkTimer = null, bkSha = null;
+const te = new TextEncoder(), td = new TextDecoder();
+const b64 = u8 => btoa(String.fromCharCode(...u8));
+const unb64 = s => Uint8Array.from(atob(s.replace(/\s/g,'')), c => c.charCodeAt(0));
+async function deriveKey(pass, salt){
+  const base = await crypto.subtle.importKey('raw', te.encode(pass), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name:'PBKDF2', salt, iterations:310000, hash:'SHA-256' }, base, { name:'AES-GCM', length:256 }, false, ['encrypt','decrypt']);
+}
+async function encryptList(list, pass){
+  const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name:'AES-GCM', iv }, await deriveKey(pass, salt), te.encode(JSON.stringify(list))));
+  return JSON.stringify({ v:1, alg:'AES-GCM-256', kdf:'PBKDF2-SHA256', iter:310000, salt:b64(salt), iv:b64(iv), data:b64(ct), date:new Date().toISOString() });
+}
+async function decryptList(text, pass){
+  const o = JSON.parse(text);
+  const pt = await crypto.subtle.decrypt({ name:'AES-GCM', iv:unb64(o.iv) }, await deriveKey(pass, unb64(o.salt)), unb64(o.data));
+  return JSON.parse(td.decode(pt));
+}
+async function gh(method, body){
+  const c = bkCfg();
+  const r = await fetch('https://api.github.com/repos/' + c.repo + '/contents/' + FILE, {
+    method, headers: { 'Authorization':'Bearer ' + c.token, 'Accept':'application/vnd.github+json', 'X-GitHub-Api-Version':'2022-11-28' },
+    body: body ? JSON.stringify(body) : undefined, cache:'no-store' });
+  if(method === 'GET' && r.status === 404) return null;
+  if(!r.ok){
+    const msg = r.status === 401 ? 'jeton refusé (expiré ou incorrect)' : r.status === 403 ? 'jeton sans droit d\'écriture sur ce dépôt' : r.status === 404 ? 'dépôt introuvable (nom ou droits du jeton)' : 'erreur GitHub ' + r.status;
+    throw new Error(msg);
+  }
+  return r.json();
+}
+async function readRemote(){
+  const j = await gh('GET'); if(!j) return null;
+  bkSha = j.sha;
+  return td.decode(unb64(j.content));
+}
+function bkStatus(t, ok){ $('#bkMsg').textContent = t; $('#bkMsg').style.color = ok === false ? 'var(--err)' : ''; }
+function bkRender(){
+  const c = bkCfg(), configured = !!(c.repo && c.token);
+  $('#bkRepo').value = c.repo || repoGuess(); $('#bkToken').value = c.token ? '••••••••••' : '';
+  $('#bkSetup').hidden = configured;
+  $('#bkEdit').hidden = !configured;
+  $('#bkState').textContent = bkKeyPass ? 'ACTIVE' : 'INACTIVE';
+  $('#bkUnlock').textContent = bkKeyPass ? 'Sauvegarder maintenant' : 'Activer la sauvegarde';
+}
+function readSetup(){
+  const c = bkCfg(), repo = $('#bkRepo').value.trim().replace(/^https:\/\/github\.com\//,'').replace(/\/$/,'');
+  const tok = $('#bkToken').value.trim();
+  if(!$('#bkSetup').hidden){
+    if(!/^[\w.-]+\/[\w.-]+$/.test(repo)){ bkStatus('Indiquez le dépôt sous la forme compte/nom-du-depot.', false); return false; }
+    if(!tok || tok.startsWith('•')){ bkStatus('Collez le jeton d\'accès GitHub.', false); return false; }
+    bkSave({ repo, token: tok });
+  }
+  return !!(bkCfg().repo && bkCfg().token);
+}
+async function backupNow(){
+  if(!bkKeyPass) return;
+  try {
+    bkStatus('Sauvegarde en cours…');
+    const text = await encryptList(get(), bkKeyPass);
+    if(bkSha === null) await readRemote().catch(() => null);
+    const res = await gh('PUT', { message:'Sauvegarde liste techniciens', content: btoa(text), ...(bkSha ? { sha: bkSha } : {}) });
+    bkSha = res.content.sha;
+    bkStatus('Sauvegardé sur GitHub le ' + new Date().toLocaleString('fr-FR') + ' (' + get().length + ' technicien(s)).');
+  } catch(e){ bkSha = null; bkStatus('Sauvegarde impossible : ' + e.message + '.', false); }
+}
+function backupSoon(){ if(!bkKeyPass) return; clearTimeout(bkTimer); bkTimer = setTimeout(backupNow, 800); }
+$('#bkUnlock').onclick = async () => {
+  if(bkKeyPass){ backupNow(); return; }
+  if(!readSetup()) return;
+  const pass = $('#bkPass').value;
+  if(pass.length < 12){ bkStatus('Mot de passe trop court : 12 caractères minimum (une phrase de plusieurs mots).', false); return; }
+  try {
+    bkStatus('Connexion à GitHub…');
+    const remote = await readRemote();
+    if(remote){
+      let list; try { list = await decryptList(remote, pass); } catch(e){ bkStatus('Mot de passe incorrect pour la sauvegarde existante.', false); return; }
+      // fusion : on garde la version locale en cas de doublon (même prénom + nom)
+      const local = get(), keyOf = o => (o.prenom + '|' + o.nom).toLowerCase();
+      const seen = new Set(local.map(keyOf)), merged = local.concat(list.filter(o => !seen.has(keyOf(o))));
+      try { localStorage.setItem(K, JSON.stringify(merged)); } catch(e){}
+      renderList();
+    }
+    bkKeyPass = pass; $('#bkPass').value = ''; bkRender();
+    await backupNow();
+  } catch(e){ bkStatus('Connexion impossible : ' + e.message + '.', false); }
+};
+$('#bkRestore').onclick = async () => {
+  if(!readSetup()) return;
+  const pass = bkKeyPass || $('#bkPass').value;
+  if(!pass){ bkStatus('Saisissez le mot de passe de chiffrement.', false); return; }
+  try {
+    const remote = await readRemote();
+    if(!remote){ bkStatus('Aucune sauvegarde trouvée dans ce dépôt.', false); return; }
+    let list; try { list = await decryptList(remote, pass); } catch(e){ bkStatus('Mot de passe incorrect.', false); return; }
+    try { localStorage.setItem(K, JSON.stringify(list)); } catch(e){}
+    renderList(); bkKeyPass = pass; $('#bkPass').value = ''; bkRender();
+    bkStatus('Liste restaurée depuis GitHub : ' + list.length + ' technicien(s).');
+  } catch(e){ bkStatus('Restauration impossible : ' + e.message + '.', false); }
+};
+$('#bkEdit').onclick = () => { $('#bkSetup').hidden = false; $('#bkEdit').hidden = true; $('#bkToken').value = ''; bkKeyPass = null; bkRender(); $('#bkSetup').hidden = false; };
+$('#bkPass').addEventListener('keydown', e => { if(e.key === 'Enter') $('#bkUnlock').click(); });
+bkRender();
+if(bkCfg().repo) bkStatus('Saisissez votre mot de passe puis « Activer la sauvegarde » : la liste sera synchronisée avec GitHub.');
 </script>
 </body>
 </html>
