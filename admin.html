@@ -207,6 +207,8 @@ $('#gen').onclick = () => {
   $('#err').hidden = true;
   const l = get().filter(x => !(x.prenom === o.prenom && x.nom === o.nom)); l.unshift(o); put(l);
   render(o); renderList();
+  if(typeof bkKeyPass !== 'undefined' && bkKeyPass){ toast('Lien créé. Sauvegarde sur GitHub en cours…'); }
+  else { bkNeedAttention(); return; }
   if(window.innerWidth < 860) $('#out').scrollIntoView({ behavior:'smooth' });
 };
 $('#clear').onclick = () => {
@@ -266,6 +268,14 @@ async function readRemote(){
   bkSha = j.sha;
   return td.decode(unb64(j.content));
 }
+function bkNeedAttention(){
+  const card = $('#bk'), configured = !!(bkCfg().repo && bkCfg().token);
+  card.style.borderColor = 'var(--err)'; card.style.boxShadow = '0 0 0 3px rgba(180,35,24,.15)';
+  bkStatus(configured ? 'Ce technicien n\'est pas encore sauvegardé : saisissez votre mot de passe puis « Activer la sauvegarde ».'
+                      : 'Ce technicien n\'est pas sauvegardé : configurez la sauvegarde (jeton GitHub + mot de passe).', false);
+  card.scrollIntoView({ behavior:'smooth', block:'center' });
+  setTimeout(() => (configured ? $('#bkPass') : $('#bkToken')).focus(), 400);
+}
 function bkStatus(t, ok){ $('#bkMsg').textContent = t; $('#bkMsg').style.color = ok === false ? 'var(--err)' : ''; }
 function bkRender(){
   const c = bkCfg(), configured = !!(c.repo && c.token);
@@ -294,6 +304,8 @@ async function backupNow(){
     const res = await gh('PUT', { message:'Sauvegarde liste techniciens', content: btoa(text), ...(bkSha ? { sha: bkSha } : {}) });
     bkSha = res.content.sha;
     bkStatus('Sauvegardé sur GitHub le ' + new Date().toLocaleString('fr-FR') + ' (' + get().length + ' technicien(s)).');
+    $('#bk').style.borderColor = ''; $('#bk').style.boxShadow = '';
+    toast('Sauvegarde GitHub effectuée.');
   } catch(e){ bkSha = null; bkStatus('Sauvegarde impossible : ' + e.message + '.', false); }
 }
 function backupSoon(){ if(!bkKeyPass) return; clearTimeout(bkTimer); bkTimer = setTimeout(backupNow, 800); }
