@@ -196,14 +196,15 @@ const K = 'bi.admin.techs';
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 /* Coffre local : toutes les données de la page (techniciens, clients, clé clients, dépôt, jeton) sont chiffrées
    sur ce poste avec le mot de passe administrateur (AES-GCM 256, clé PBKDF2-SHA256 310 000 itérations). */
+const ITER = 600000;
 const KV = 'bi.admin.vault', LEGACY = ['bi.admin.techs', 'bi.admin.clients', 'bi.admin.ck', 'bi.admin.backup'];
-let VAULT = null, vKey = null, vSalt = null, vTimer = null;
+let VAULT = null, vKey = null, vSalt = null, vTimer = null, vIter = ITER;
 function saveVault(){ clearTimeout(vTimer); vTimer = setTimeout(writeVault, 150); }
 async function writeVault(){
   if(!VAULT || !vKey) return;
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const ct = new Uint8Array(await crypto.subtle.encrypt({ name:'AES-GCM', iv }, vKey, new TextEncoder().encode(JSON.stringify(VAULT))));
-  try { localStorage.setItem(KV, JSON.stringify({ v:1, iter:310000, salt:b64(vSalt), iv:b64(iv), data:b64(ct) })); }
+  try { localStorage.setItem(KV, JSON.stringify({ v:1, iter:vIter, salt:b64(vSalt), iv:b64(iv), data:b64(ct) })); }
   catch(e){ toast('Mémoire du navigateur pleine : données non enregistrées.'); }
 }
 const get = () => (VAULT && VAULT.techs) || [];
@@ -305,18 +306,18 @@ let bkKeyPass = null, bkTimer = null, bkSha = null;
 const te = new TextEncoder(), td = new TextDecoder();
 const b64 = u8 => btoa(String.fromCharCode(...u8));
 const unb64 = s => Uint8Array.from(atob(s.replace(/\s/g,'')), c => c.charCodeAt(0));
-async function deriveKey(pass, salt){
+async function deriveKey(pass, salt, iter){
   const base = await crypto.subtle.importKey('raw', te.encode(pass), 'PBKDF2', false, ['deriveKey']);
-  return crypto.subtle.deriveKey({ name:'PBKDF2', salt, iterations:310000, hash:'SHA-256' }, base, { name:'AES-GCM', length:256 }, false, ['encrypt','decrypt']);
+  return crypto.subtle.deriveKey({ name:'PBKDF2', salt, iterations: iter || ITER, hash:'SHA-256' }, base, { name:'AES-GCM', length:256 }, false, ['encrypt','decrypt']);
 }
 async function encryptList(list, pass){
   const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
   const ct = new Uint8Array(await crypto.subtle.encrypt({ name:'AES-GCM', iv }, await deriveKey(pass, salt), te.encode(JSON.stringify(list))));
-  return JSON.stringify({ v:1, alg:'AES-GCM-256', kdf:'PBKDF2-SHA256', iter:310000, salt:b64(salt), iv:b64(iv), data:b64(ct), date:new Date().toISOString() });
+  return JSON.stringify({ v:1, alg:'AES-GCM-256', kdf:'PBKDF2-SHA256', iter:ITER, salt:b64(salt), iv:b64(iv), data:b64(ct), date:new Date().toISOString() });
 }
 async function decryptList(text, pass){
   const o = JSON.parse(text);
-  const pt = await crypto.subtle.decrypt({ name:'AES-GCM', iv:unb64(o.iv) }, await deriveKey(pass, unb64(o.salt)), unb64(o.data));
+  const pt = await crypto.subtle.decrypt({ name:'AES-GCM', iv:unb64(o.iv) }, await deriveKey(pass, unb64(o.salt), o.iter || 310000), unb64(o.data));
   return JSON.parse(td.decode(pt));
 }
 async function gh(method, body, file){
@@ -367,7 +368,7 @@ async function backupNow(){
   if(!bkKeyPass) return;
   try {
     bkStatus('Sauvegarde en cours…');
-    const text = await encryptList({ techniciens: get(), clientsKey: clientsKey() }, bkKeyPass);
+    const text = await encryptList({ techniciens: get(), clientsKey: clientsKey(), repo: VAULT.repo, token: VAULT.token }, bkKeyPass);
     if(bkSha === null) await readRemote().catch(() => null);
     const res = await gh('PUT', { message:'Sauvegarde liste techniciens', content: btoa(text), ...(bkSha ? { sha: bkSha } : {}) });
     bkSha = res.content.sha;
@@ -444,6 +445,7 @@ function mergeCl(base, add){
 // reprise d'une sauvegarde admin (ancien format = tableau de techniciens)
 async function adoptPayload(p){
   if(Array.isArray(p)) return p;
+  if(p.token && !VAULT.token){ VAULT.repo = p.repo || VAULT.repo; VAULT.token = p.token; saveVault(); bkRender(); }
   if(p.clientsKey && p.clientsKey !== VAULT.ck){
     VAULT.ck = p.clientsKey; saveVault();
     clSha = null;
@@ -550,9 +552,24 @@ $('#clImport').onclick = () => {
 let ADMIN_PASS = null;
 const legacyData = () => LEGACY.some(k => { try { return localStorage.getItem(k) !== null; } catch(e){ return false; } });
 const readJSON = k => { try { return JSON.parse(localStorage.getItem(k)); } catch(e){ return null; } };
+let REMOTE = null;   // sauvegarde trouvée sur GitHub pour un navigateur vierge
+async function findRemoteBackup(){
+  const rg = repoGuess();
+  try {
+    if(rg){ const r = await fetch('https://api.github.com/repos/' + rg + '/contents/' + FILE, { cache:'no-store', headers:{ 'Accept':'application/vnd.github.raw+json' } }); if(r.ok) return await r.text(); }
+  } catch(e){}
+  try { const r = await fetch(FILE + '?t=' + Date.now(), { cache:'no-store' }); if(r.ok){ const t = await r.text(); JSON.parse(t); return t; } } catch(e){}
+  return null;
+}
 function lockMode(){
-  const hasVault = !!readJSON(KV), first = !hasVault;
+  const hasVault = !!readJSON(KV), first = !hasVault && !REMOTE;
   $('#lkConfirmWrap').hidden = !first;
+  if(!hasVault && REMOTE){
+    $('#lockTitle').textContent = 'Page d\'administration verrouillée';
+    $('#lockText').textContent = 'Nouveau navigateur : une sauvegarde chiffrée a été trouvée sur GitHub. Saisissez votre mot de passe administrateur pour retrouver techniciens, clients et accès GitHub.';
+    $('#lkGo').textContent = 'Déverrouiller';
+    return false;
+  }
   $('#lockTitle').textContent = first ? 'Protéger la page d\'administration' : 'Page d\'administration verrouillée';
   $('#lockText').textContent = first
     ? (legacyData() ? 'Vos données (techniciens, clients, jeton GitHub) vont être chiffrées sur ce poste. ' : '') + 'Choisissez un mot de passe administrateur : 12 caractères minimum, idéalement une phrase de plusieurs mots. S\'il existe déjà une sauvegarde GitHub, utilisez le même mot de passe. Il ne pourra pas être récupéré en cas d\'oubli.'
@@ -560,9 +577,9 @@ function lockMode(){
   $('#lkGo').textContent = first ? 'Protéger et ouvrir' : 'Déverrouiller';
   return first;
 }
-async function deriveVaultKey(pass, salt){
+async function deriveVaultKey(pass, salt, iter){
   const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']);
-  return crypto.subtle.deriveKey({ name:'PBKDF2', salt, iterations:310000, hash:'SHA-256' }, base, { name:'AES-GCM', length:256 }, false, ['encrypt','decrypt']);
+  return crypto.subtle.deriveKey({ name:'PBKDF2', salt, iterations: iter || ITER, hash:'SHA-256' }, base, { name:'AES-GCM', length:256 }, false, ['encrypt','decrypt']);
 }
 $('#lockForm').addEventListener('submit', async e => {
   e.preventDefault();
@@ -575,17 +592,33 @@ $('#lockForm').addEventListener('submit', async e => {
   msg.style.color = ''; msg.textContent = 'Ouverture…'; $('#lkGo').disabled = true;
   try {
     if(first){
-      vSalt = crypto.getRandomValues(new Uint8Array(16)); vKey = await deriveVaultKey(pass, vSalt);
+      vSalt = crypto.getRandomValues(new Uint8Array(16)); vKey = await deriveVaultKey(pass, vSalt); vIter = ITER;
       const bk = readJSON('bi.admin.backup') || {};
       VAULT = { techs: readJSON('bi.admin.techs') || [], clients: readJSON('bi.admin.clients') || [], ck: localStorage.getItem('bi.admin.ck') || '', repo: bk.repo || '', token: bk.token || '' };
       if(!VAULT.ck) delete VAULT.ck;
       await writeVault();
       LEGACY.forEach(k => { try { localStorage.removeItem(k); } catch(e){} });   // plus aucune donnée en clair
+    } else if(!readJSON(KV) && REMOTE){
+      let payload;
+      try { payload = await decryptList(REMOTE, pass); }
+      catch(err){ msg.style.color = 'var(--err)'; msg.textContent = 'Mot de passe incorrect.'; $('#lkGo').disabled = false; $('#lkPass').select(); return; }
+      vSalt = crypto.getRandomValues(new Uint8Array(16)); vKey = await deriveVaultKey(pass, vSalt); vIter = ITER;
+      VAULT = Array.isArray(payload) ? { techs: payload, clients: [], repo: repoGuess() }
+        : { techs: payload.techniciens || [], clients: [], ck: payload.clientsKey, repo: payload.repo || repoGuess(), token: payload.token || '' };
+      if(!VAULT.ck) delete VAULT.ck;
+      // liste des clients : fichier public chiffré, lisible avec la clé de la sauvegarde
+      if(VAULT.ck){
+        try {
+          const r = await fetch(CLFILE + '?t=' + Date.now(), { cache:'no-store' });
+          if(r.ok) VAULT.clients = await decClients(await r.text(), VAULT.ck);
+        } catch(err){}
+      }
+      await writeVault();
     } else {
       const o = readJSON(KV);
-      vSalt = unb64(o.salt); vKey = await deriveVaultKey(pass, vSalt);
+      vSalt = unb64(o.salt); vIter = o.iter || 310000; vKey = await deriveVaultKey(pass, vSalt, vIter);
       try { VAULT = JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({ name:'AES-GCM', iv:unb64(o.iv) }, vKey, unb64(o.data)))); }
-      catch(err){ vKey = null; msg.style.color = 'var(--err)'; msg.textContent = 'Mot de passe incorrect.'; $('#lkGo').disabled = false; $('#lkPass').select(); return; }
+      catch(err){ vKey = null; msg.style.color = 'var(--err)'; msg.textContent = 'Mot de passe incorrect.'; $('#lkGo').disabled = false; $('#lkPass').select(); return; }      if(vIter < ITER){ vSalt = crypto.getRandomValues(new Uint8Array(16)); vIter = ITER; vKey = await deriveVaultKey(pass, vSalt); await writeVault(); }   // renforcement à 600 000 itérations
     }
   } catch(err){ msg.style.color = 'var(--err)'; msg.textContent = 'Erreur : ' + err.message; $('#lkGo').disabled = false; return; }
   ADMIN_PASS = pass; $('#lkPass').value = ''; $('#lkPass2').value = ''; msg.textContent = ''; $('#lkGo').disabled = false;
@@ -605,6 +638,10 @@ function startApp(){
 }
 if(!window.crypto || !crypto.subtle){ $('#lkMsg').textContent = 'Ce navigateur ne permet pas le chiffrement : utilisez Chrome, Edge ou Firefox à jour.'; $('#lkGo').disabled = true; }
 lockMode(); $('#lkPass').focus();
+if(!readJSON(KV) && window.crypto && crypto.subtle){
+  $('#lkGo').disabled = true; $('#lkMsg').textContent = 'Recherche d\'une sauvegarde sur GitHub…';
+  findRemoteBackup().then(t => { REMOTE = t; lockMode(); $('#lkGo').disabled = false; $('#lkMsg').textContent = ''; $('#lkPass').focus(); });
+}
 </script>
 </body>
 </html>
