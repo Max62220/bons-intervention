@@ -57,7 +57,7 @@ input:focus-visible,button:focus-visible,a:focus-visible{outline:2.5px solid var
 .list{display:flex;flex-direction:column;gap:6px}
 .item{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:8px}
 .item b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.item span{display:block;font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item span{display:block;font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
 .ini{font:600 12px var(--f-mono);background:var(--accent-soft);color:var(--accent);border-radius:5px;padding:1px 6px;margin-right:6px}
 #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:14px;max-width:calc(100% - 32px);opacity:0;pointer-events:none;transition:opacity .2s}
 #toast.show{opacity:1}
@@ -197,7 +197,7 @@ function render(o){
 }
 function renderList(){
   const l = get();
-  $('#list').innerHTML = l.length ? l.map((o,i) => `<div class="item"><div style="min-width:0"><b><span class="ini" style="display:inline">${esc(o.initiales)}</span>${esc(o.prenom + ' ' + o.nom)}</b><span>${esc(o.entreprise)} · ${esc(o.dest)}</span></div>
+  $('#list').innerHTML = l.length ? l.map((o,i) => `<div class="item"><div style="min-width:0"><b><span class="ini" style="display:inline">${esc(o.initiales)}</span>${esc(o.prenom + ' ' + o.nom)}</b><span>${esc(o.entreprise)}</span><span>Tech : ${esc(o.email || 'e-mail non renseigné')}</span><span>Bons envoyés à : ${esc(o.dest)}${o.cc ? ' (Cc ' + esc(o.cc) + ')' : ''}</span></div>
     <span style="display:flex;gap:6px"><a class="btn small" href="${esc(appUrl + '#setup=' + encode(o))}" target="_blank" rel="noopener">Créer un bon</a><button type="button" class="btn small" data-open="${i}">Lien</button></span><button type="button" class="btn small" data-del="${i}" aria-label="Retirer">✕</button></div>`).join('')
     : '<p class="empty">Aucun technicien pour l’instant. Cette liste reste sur ce poste uniquement.</p>';
 }
