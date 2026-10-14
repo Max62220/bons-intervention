@@ -20,7 +20,7 @@ Ouvrir une première fois avec du réseau : ensuite l'application fonctionne hor
 
 ## Mise à jour
 
-Remplacer `index.html` sur GitHub, et changer `bi-v5` en `bi-v6` dans `sw.js`
+Remplacer `index.html` sur GitHub, et changer `bi-v6` en `bi-v7` dans `sw.js`
 pour forcer le rafraîchissement du cache sur les appareils.
 
 ## Numérotation

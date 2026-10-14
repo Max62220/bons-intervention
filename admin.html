@@ -99,6 +99,8 @@ input:focus-visible,button:focus-visible,a:focus-visible{outline:2.5px solid var
       <div id="outBox" hidden style="display:flex;flex-direction:column;gap:12px">
         <p style="margin:0"><strong id="outWho"></strong></p>
         <div class="link" id="link"></div>
+        <a class="btn primary" id="newBon" href="#" target="_blank" rel="noopener">Créer un bon avec ce profil</a>
+        <p class="hint" style="margin-top:-6px">Ouvre l'appli dans un nouvel onglet, configurée pour ce technicien (votre navigateur garde ensuite ce profil jusqu'au prochain).</p>
         <div class="btns">
           <button type="button" class="btn small" id="copy">Copier le lien</button>
           <a class="btn small" id="sms" href="#">Envoyer par SMS</a>
@@ -168,6 +170,7 @@ function render(o){
   $('#outEmpty').hidden = true; $('#outBox').hidden = false;
   $('#outWho').textContent = who + ' · ' + o.entreprise;
   $('#link').textContent = link;
+  $('#newBon').href = link;
   const msg = 'Bonjour ' + o.prenom + ', voici le lien pour configurer l’appli des bons d’intervention : ' + link;
   $('#sms').href = 'sms:?&body=' + encodeURIComponent(msg);
   $('#mail').href = 'mailto:' + encodeURIComponent(o.email || '') + '?subject=' + encodeURIComponent('Configuration de l’appli Bons d’intervention') +
@@ -179,7 +182,7 @@ function render(o){
 function renderList(){
   const l = get();
   $('#list').innerHTML = l.length ? l.map((o,i) => `<div class="item"><div style="min-width:0"><b><span class="ini" style="display:inline">${esc(o.initiales)}</span>${esc(o.prenom + ' ' + o.nom)}</b><span>${esc(o.entreprise)} · ${esc(o.dest)}</span></div>
-    <button type="button" class="btn small" data-open="${i}">Lien</button><button type="button" class="btn small" data-del="${i}" aria-label="Retirer">✕</button></div>`).join('')
+    <span style="display:flex;gap:6px"><a class="btn small" href="${esc(appUrl + '#setup=' + encode(o))}" target="_blank" rel="noopener">Créer un bon</a><button type="button" class="btn small" data-open="${i}">Lien</button></span><button type="button" class="btn small" data-del="${i}" aria-label="Retirer">✕</button></div>`).join('')
     : '<p class="empty">Aucun technicien pour l’instant. Cette liste reste sur ce poste uniquement.</p>';
 }
 $('#gen').onclick = () => {
