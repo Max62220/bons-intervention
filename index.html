@@ -37,15 +37,12 @@ html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 var(--f-sans);padding-top:env(safe-area-inset-top,0px)}
 button,input,textarea,select{font:inherit;color:inherit}
 [hidden]{display:none!important}
-.top{position:sticky;top:0;z-index:5;background:var(--surface);border-bottom:1px solid var(--line);padding:10px 16px 0}
+.top{position:sticky;top:0;z-index:5;background:var(--surface);border-bottom:1px solid var(--line);padding:10px 16px}
 .brand{display:flex;align-items:center;gap:10px;max-width:760px;margin:0 auto}
 .mark{width:30px;height:30px;border-radius:7px;background:var(--accent);display:grid;place-items:center;color:var(--accent-ink);font:600 13px var(--f-mono);flex:none}
 .brand strong{display:block;font-size:16px;letter-spacing:-.01em}
 .brand small{display:block;color:var(--muted);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .brand>div{min-width:0}
-.tabs{display:flex;gap:4px;max-width:760px;margin:8px auto 0;overflow-x:auto}
-.tabs button{border:0;background:none;padding:9px 12px 11px;color:var(--muted);font-weight:500;border-bottom:2.5px solid transparent;cursor:pointer;white-space:nowrap}
-.tabs button.on{color:var(--ink);border-bottom-color:var(--accent)}
 main{max-width:760px;margin:0 auto;padding:16px 16px 0}
 .view{display:flex;flex-direction:column;gap:14px;padding-bottom:16px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:12px}
@@ -119,11 +116,6 @@ dl.sum dd{margin:0;overflow-wrap:anywhere}
     <span class="mark" aria-hidden="true">BI</span>
     <div><strong>Bons d'intervention</strong><small id="who">Technicien non renseigné</small></div>
   </div>
-  <nav class="tabs" aria-label="Navigation">
-    <button type="button" data-view="form" class="on">Bon en cours</button>
-    <button type="button" data-view="history">Historique</button>
-    <button type="button" data-view="settings">Réglages</button>
-  </nav>
 </header>
 
 <main>
@@ -199,9 +191,8 @@ dl.sum dd{margin:0;overflow-wrap:anywhere}
 
   <div class="card">
     <h2>Envoi du bon</h2>
-    <label class="f">Destinataires <span class="req" aria-hidden="true">*</span>
-      <input type="text" id="f-dest" inputmode="email" placeholder="adresse@exemple.fr, autre@exemple.fr"></label>
-    <label class="f">Copie (Cc)<input type="text" id="f-cc" inputmode="email"></label>
+    <div><span class="lbl">Destinataires</span><output class="mails" id="f-dest"></output></div>
+    <div><span class="lbl">Copie (Cc)</span><output class="mails" id="f-cc"></output></div>
     <label class="check"><input type="checkbox" id="f-sendClient"> Envoyer aussi au client (e-mail ci-dessus)</label>
   </div>
 
@@ -253,57 +244,18 @@ dl.sum dd{margin:0;overflow-wrap:anywhere}
   </div>
 </section>
 
-<!-- ============ HISTORIQUE ============ -->
-<section id="view-history" class="view" hidden>
-  <div class="bon-head"><div><span class="lbl">Bons validés sur cet appareil</span><strong id="h-count"></strong></div></div>
-  <div class="hist" id="hist"></div>
-</section>
-
-<!-- ============ RÉGLAGES ============ -->
-<section id="view-settings" class="view" hidden>
-  <div class="card" id="setupCard" hidden style="border-color:var(--accent)">
-    <h2>Configuration reçue</h2>
-    <p style="margin:0" id="setupText"></p>
-    <dl class="sum" id="setupSum"></dl>
-    <p class="hint" id="setupWarn" hidden>Elle remplacera vos réglages actuels. Vos bons et votre historique sont conservés.</p>
-    <div style="display:flex;gap:10px;flex-wrap:wrap">
-      <button type="button" class="btn primary" id="setupApply">Appliquer cette configuration</button>
-      <button type="button" class="btn" id="setupIgnore">Ignorer</button>
-    </div>
-  </div>
-  <div class="card" id="firstRun" hidden style="border-color:var(--accent)">
-    <p style="margin:0"><strong>Première utilisation.</strong> Renseignez votre identité : elle sert au numéro de bon et apparaît sur le PDF.</p>
+<!-- ============ VERROU ============ -->
+<section id="view-lock" class="view" hidden>
+  <div class="card" style="border-color:var(--accent)">
+    <h2>Accès réservé</h2>
+    <p style="margin:0"><strong>Cette application doit être ouverte avec le lien personnel envoyé par votre responsable</strong> (SMS, e-mail ou QR code).</p>
+    <p class="hint">Ouvrez ce lien sur ce téléphone : l'application se configure automatiquement avec votre nom, votre entreprise et les destinataires des bons.</p>
   </div>
   <div class="card">
-    <h2>Technicien</h2>
-    <div class="row">
-      <label class="f">Prénom <span class="req" aria-hidden="true">*</span><input type="text" id="s-prenom" autocomplete="given-name"></label>
-      <label class="f">Nom <span class="req" aria-hidden="true">*</span><input type="text" id="s-nom" autocomplete="family-name"></label>
-      <label class="f">Initiales<input type="text" id="s-ini" maxlength="4" style="text-transform:uppercase;font-family:var(--f-mono)"></label>
-    </div>
-    <label class="f">Mon e-mail<input type="email" id="s-email" inputmode="email" autocomplete="email"></label>
-    <label class="check"><input type="checkbox" id="s-ccSelf"> Me mettre en copie de chaque bon</label>
-  </div>
-  <div class="card">
-    <h2>Valeurs par défaut</h2>
-    <label class="f">Mon entreprise (prestataire)<input type="text" id="s-entreprise" list="entreprises" autocomplete="organization"></label>
-    <label class="f">Destinataire habituel des bons<input type="text" id="s-dest" inputmode="email" placeholder="bureau@donneur-ordre.fr"></label>
-    <label class="f">Copie habituelle (Cc)<input type="text" id="s-cc" inputmode="email"></label>
-    <p class="hint">Format du numéro : AAAAMMJJ-INITIALES-NNN, par exemple <span style="font-family:var(--f-mono)" id="s-sample"></span>.</p>
-  </div>
-  <div class="bar">
-    <button type="button" class="btn primary" id="sSave">Enregistrer</button>
-  </div>
-  <div class="card">
-    <h2>Lien de configuration</h2>
-    <p class="hint">Si votre responsable vous a envoyé un lien et que l'appli est installée sur l'écran d'accueil (iPhone), copiez le lien et collez-le ici.</p>
-    <label class="f">Lien ou code reçu<input type="text" id="s-import" autocomplete="off" spellcheck="false"></label>
-    <button type="button" class="btn small" id="sImport">Lire la configuration</button>
-  </div>
-  <div class="card">
-    <h2>Données</h2>
-    <p class="hint">Tout est stocké uniquement sur cet appareil, dans ce navigateur. Rien n'est envoyé à un serveur.</p>
-    <button type="button" class="btn small danger" id="sWipe">Supprimer tous les bons de cet appareil</button>
+    <h2>Application installée sur l'écran d'accueil (iPhone)</h2>
+    <p class="hint">Sur iPhone, l'icône de l'écran d'accueil ne partage pas les données de Safari. Copiez le lien reçu et collez-le ici.</p>
+    <label class="f">Lien reçu<input type="text" id="l-import" autocomplete="off" spellcheck="false" placeholder="https://…#setup=…"></label>
+    <button type="button" class="btn primary" id="lImport">Activer l'application</button>
   </div>
 </section>
 </main>
@@ -355,10 +307,11 @@ function settings(){
   return { ...s, entreprise: s.entreprise || CONF.entreprise || '', dest: s.dest || CONF.destinataire || '', cc: s.cc || CONF.cc || '' };
 }
 const hist = () => store.get(K_HIST, []);
-function saveHist(list){ return store.set(K_HIST, list); }
+function saveHist(list){ return store.set(K_HIST, list.slice(0, 3)); }
+const usedNums = () => store.get('bi.used', []);
 
 function newNumero(date, ini){
-  const used = new Set(hist().map(b => b.numero));
+  const used = new Set([...usedNums(), ...hist().map(b => b.numero)]);
   let n; do { n = date.replaceAll('-','') + '-' + (ini || 'XX') + '-' + String(Math.floor(Math.random()*1000)).padStart(3,'0'); } while(used.has(n));
   return n;
 }
@@ -384,7 +337,7 @@ function fillForm(){
   $('#f-sendClient').checked = !!draft.sendClient;
   $('#numero').textContent = draft.numero;
   const t = draft.tech;
-  $('#techLine').textContent = t.prenom ? 'Technicien : ' + t.prenom + ' ' + t.nom + ' (' + t.initiales + ')' : 'Renseignez votre nom dans Réglages.';
+  $('#techLine').textContent = t.prenom ? 'Technicien : ' + t.prenom + ' ' + t.nom + ' (' + t.initiales + ')' : '';
   updDuree(); renderMat(); renderPhotos(); sigRestore();
 }
 const nbOf = b => Math.max(1, parseInt(b.nbTech, 10) || 1);
@@ -505,7 +458,7 @@ function recipients(b){
 }
 function check(){
   const err = [];
-  if(!draft.tech.prenom || !draft.tech.nom) err.push('votre prénom et votre nom (onglet Réglages)');
+  if(!draft.tech.prenom || !draft.tech.nom) err.push('la configuration (ouvrez le lien envoyé par votre responsable)');
   const need = [['entreprise',"l'entreprise de l'intervenant"],['date',"la date d'intervention"],['client','le nom du client'],['codeClient','le code client'],['departement','le département'],
     ['debut',"l'heure d'arrivée"],['fin','l’heure de départ'],['travaux','les travaux réalisés'],['signNom','le nom du signataire']];
   need.forEach(([k, l]) => { if(!String(draft[k]||'').trim()) err.push(l); });
@@ -529,6 +482,7 @@ $('#btnValidate').onclick = () => {
   const b = { ...draft, statut:'valide', validatedAt: Date.now(), duree: dureeMin(draft.debut, draft.fin, draft.pause) };
   const list = hist().filter(x => x.numero !== b.numero); list.unshift(b);
   if(!saveHist(list)) return;
+  store.set('bi.used', [b.numero, ...usedNums()].slice(0, 500)); store.set('bi.showRecap', true);
   store.del(K_DRAFT); draft = blankDraft();
   showRecap(b.numero);
 };
@@ -667,7 +621,7 @@ let cur = null, curPdf = null;
 const canShareFiles = (() => { try { return !!(navigator.canShare && navigator.canShare({ files: [new File(['x'], 'x.pdf', {type:'application/pdf'})] })); } catch(e){ return false; } })();
 function pillOf(b){ return b.statut === 'envoye' ? ['envoye', 'Envoyé le ' + fmtStamp(b.sentAt)] : b.statut === 'valide' ? ['valide','Validé, à envoyer'] : ['brouillon','Brouillon']; }
 function showRecap(num){
-  cur = hist().find(b => b.numero === num); if(!cur) return show('history');
+  cur = hist().find(b => b.numero === num); if(!cur) return show('form');
   curPdf = null; show('recap');
   const b = cur, {to, cc} = recipients(b), [pc, pl] = pillOf(b);
   $('#r-num').textContent = b.numero; const p = $('#r-pill'); p.className = 'pill ' + pc; p.textContent = pl;
@@ -713,111 +667,64 @@ $('#aPdf').onclick = () => { if(curPdf) download(curPdf, fileName(cur)); };
 $('#aJson').onclick = () => { if(cur) download(jsonBlob(cur), jsonName(cur)); };
 $('#aCopy').onclick = () => { const {to, cc} = recipients(cur); copyText(to.concat(cc).join(', ')).then(ok => toast(ok ? 'Adresses copiées.' : 'Copie impossible : sélectionnez les adresses à la main.', !ok)); };
 $('#aSent').onclick = () => { markSent(); toast('Bon marqué comme envoyé.'); };
-$('#aNew').onclick = () => show('form');
+$('#aNew').onclick = () => { store.set('bi.showRecap', false); show('form'); };
 
-/* ---------- historique ---------- */
-function renderHist(){
-  const list = hist(); $('#h-count').textContent = list.length + ' bon' + (list.length > 1 ? 's' : '');
-  $('#hist').innerHTML = list.length ? list.map(b => {
-    const [pc, pl] = pillOf(b);
-    return `<button type="button" class="hi" data-num="${esc(b.numero)}"><span class="n">${esc(b.numero)}</span><span class="pill ${pc}">${esc(pc === 'envoye' ? 'Envoyé' : 'À envoyer')}</span>
-      <span class="c">${esc(b.client)}</span><span></span><span class="m">${fmtDate(b.date)} · ${fmtDuree(b.duree)} · ${b.materiel.length} pièce(s) · ${esc(b.entreprise)}</span></button>`;
-  }).join('') : '<div class="card"><p class="empty">Aucun bon validé pour l’instant. Les bons apparaissent ici après validation et restent consultables et renvoyables.</p></div>';
-}
-$('#hist').addEventListener('click', e => { const b = e.target.closest('[data-num]'); if(b) showRecap(b.dataset.num); });
-
-/* ---------- réglages ---------- */
-function fillSettings(){
-  const s = settings();
-  $('#s-prenom').value = s.prenom||''; $('#s-nom').value = s.nom||''; $('#s-ini').value = s.initiales||'';
-  $('#s-email').value = s.email||''; $('#s-ccSelf').checked = !!s.ccSelf; $('#s-entreprise').value = s.entreprise||'';
-  $('#s-dest').value = s.dest||''; $('#s-cc').value = s.cc||''; $('#firstRun').hidden = !!(s.prenom && s.nom); updSample();
-}
-let iniTouched = false;
-function updSample(){ $('#s-sample').textContent = today().replaceAll('-','') + '-' + ($('#s-ini').value.toUpperCase() || 'XX') + '-427'; }
-['#s-prenom','#s-nom'].forEach(s => $(s).addEventListener('input', () => { if(!iniTouched) $('#s-ini').value = initialsOf($('#s-prenom').value, $('#s-nom').value); updSample(); }));
-$('#s-ini').addEventListener('input', e => { iniTouched = true; e.target.value = e.target.value.toUpperCase().replace(/[^A-Z]/g,''); updSample(); });
-function applySettings(s, replaceDefaults){
+/* ---------- configuration (uniquement par lien) ---------- */
+function applySettings(s){
   if(!store.set(K_SET, s)) return false;
   const e = settings();
   draft.tech = techOf(e);
   draft.numero = rebuildNumero(draft.numero, draft.date, e.initiales);
-  if(replaceDefaults || !draft.entreprise) draft.entreprise = e.entreprise;
-  if(replaceDefaults || !draft.dest) draft.dest = e.dest;
-  if(replaceDefaults || !draft.cc) draft.cc = defaultCc(e);
+  draft.entreprise = draft.entreprise || e.entreprise;
+  draft.dest = e.dest; draft.cc = defaultCc(e);
   saveDraft(true); updWho(); fillEntreprises(); return true;
 }
-$('#sSave').onclick = () => {
-  const s = { prenom: $('#s-prenom').value.trim(), nom: $('#s-nom').value.trim(),
-    initiales: ($('#s-ini').value.trim().toUpperCase() || initialsOf($('#s-prenom').value, $('#s-nom').value)),
-    email: $('#s-email').value.trim(), ccSelf: $('#s-ccSelf').checked, entreprise: $('#s-entreprise').value.trim(),
-    dest: $('#s-dest').value.trim(), cc: $('#s-cc').value.trim() };
-  if(!s.prenom || !s.nom){ toast('Le prénom et le nom sont obligatoires.', true); return; }
-  if(applySettings(s, false)){ toast('Réglages enregistrés.'); show('form'); }
-};
-
-/* lien de configuration : …/#setup=<code>  (le code ne quitte jamais l'appareil : un # n'est pas envoyé au serveur) */
-let pendingSetup = null;
+/* lien de configuration : …/#setup=<code>  (la partie après # n'est jamais envoyée au serveur) */
 function decodeSetup(txt){
   try {
-    let code = String(txt || '').trim(); const i = code.indexOf('setup='); if(i >= 0) code = code.slice(i + 6);
+    let code = String(txt || '').trim(); const i = code.indexOf('setup='); if(i < 0) return null; code = code.slice(i + 6);
     code = code.split(/[&\s]/)[0].replace(/-/g,'+').replace(/_/g,'/'); while(code.length % 4) code += '=';
     const o = JSON.parse(decodeURIComponent(escape(atob(code))));
-    if(!o || !o.prenom || !o.nom) return null;
+    if(!o || !o.prenom || !o.nom || !o.dest) return null;
     const keep = ['prenom','nom','initiales','email','entreprise','dest','cc'], s = {};
     keep.forEach(k => s[k] = String(o[k] || '').trim().slice(0, 200));
     s.initiales = (s.initiales || initialsOf(s.prenom, s.nom)).toUpperCase().replace(/[^A-Z]/g,'').slice(0,4);
     s.ccSelf = !!o.ccSelf; return s;
   } catch(e){ return null; }
 }
-function showSetup(s){
-  pendingSetup = s; const cur = rawSettings();
-  $('#setupText').textContent = 'Votre responsable a préparé vos réglages. Vérifiez-les puis appliquez-les.';
-  const rows = [['Technicien', s.prenom + ' ' + s.nom + ' (' + s.initiales + ')'], ['Entreprise', s.entreprise || '—'],
-    ['Destinataire', s.dest || '—'], ['Copie', s.cc || '—'], ['Mon e-mail', s.email ? s.email + (s.ccSelf ? ' (en copie)' : '') : '—']];
-  $('#setupSum').innerHTML = rows.map(([k,v]) => '<dt>' + esc(k) + '</dt><dd>' + esc(v) + '</dd>').join('');
-  $('#setupWarn').hidden = !cur.prenom; $('#setupCard').hidden = false;
-}
-function clearHash(){ try { history.replaceState(null, '', location.pathname + location.search); } catch(e){} }
-$('#setupApply').onclick = () => {
-  if(!pendingSetup) return;
-  if(applySettings(pendingSetup, true)){ pendingSetup = null; $('#setupCard').hidden = true; clearHash(); toast('Configuration appliquée.'); show('form'); }
+const configured = () => { const s = rawSettings(); return !!(s.prenom && s.nom && s.dest); };
+$('#lImport').onclick = () => {
+  const s = decodeSetup($('#l-import').value);
+  if(!s){ toast("Ce lien n'est pas un lien de configuration valide. Demandez-en un nouveau à votre responsable.", true); return; }
+  if(applySettings(s)){ $('#l-import').value = ''; toast('Application configurée pour ' + s.prenom + ' ' + s.nom + '.'); show('form'); }
 };
-$('#setupIgnore').onclick = () => { pendingSetup = null; $('#setupCard').hidden = true; clearHash(); };
-$('#sImport').onclick = () => {
-  const s = decodeSetup($('#s-import').value);
-  if(!s){ toast("Ce lien n'est pas un lien de configuration valide.", true); return; }
-  $('#s-import').value = ''; showSetup(s); window.scrollTo(0, 0);
-};
-let wipeArm = 0;
-$('#sWipe').onclick = e => {
-  if(Date.now() - wipeArm > 4000){ wipeArm = Date.now(); e.currentTarget.textContent = 'Toucher à nouveau pour confirmer'; return; }
-  saveHist([]); e.currentTarget.textContent = 'Supprimer tous les bons de cet appareil'; toast('Historique supprimé.');
-};
-function updWho(){ const s = settings(); $('#who').textContent = s.prenom ? s.prenom + ' ' + s.nom + (s.entreprise ? ' · ' + s.entreprise : '') : 'Technicien non renseigné'; }
+function updWho(){ const s = settings(); $('#who').textContent = s.prenom ? s.prenom + ' ' + s.nom + (s.entreprise ? ' · ' + s.entreprise : '') : 'Application non configurée'; }
 function fillEntreprises(){
-  const set = new Set([settings().entreprise, ...(Array.isArray(CONF.entreprises) ? CONF.entreprises : []), ...hist().map(b => b.entreprise)].filter(Boolean));
+  const set = new Set([settings().entreprise, ...(Array.isArray(CONF.entreprises) ? CONF.entreprises : [])].filter(Boolean));
   $('#entreprises').innerHTML = [...set].map(x => '<option value="' + esc(x) + '">').join('');
 }
 
 /* ---------- navigation ---------- */
 function show(v){
-  ['form','recap','history','settings'].forEach(x => $('#view-'+x).hidden = x !== v);
-  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.view === v || (v === 'recap' && b.dataset.view === 'history')));
+  if(v !== 'lock' && !configured()) v = 'lock';
+  ['form','recap','lock'].forEach(x => $('#view-'+x).hidden = x !== v);
   if(v === 'form'){ fillForm(); requestAnimationFrame(() => sizePad(true)); }
-  if(v === 'history') renderHist();
-  if(v === 'settings') fillSettings();
   window.scrollTo(0, 0);
 }
-document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => show(b.dataset.view));
 
 /* ---------- démarrage ---------- */
 draft = store.get(K_DRAFT, null) || blankDraft();
+if(location.hash.indexOf('setup=') >= 0){
+  const s = decodeSetup(location.hash), before = JSON.stringify(rawSettings());
+  if(s){
+    applySettings(s);
+    if(JSON.stringify(rawSettings()) !== before) toast('Application configurée pour ' + s.prenom + ' ' + s.nom + '.');
+  } else toast("Le lien de configuration est incomplet. Demandez-en un nouveau à votre responsable.", true);
+}
 updWho(); fillEntreprises();
-const hashSetup = location.hash.indexOf('setup=') >= 0 ? decodeSetup(location.hash) : null;
-show(hashSetup || !settings().prenom ? 'settings' : 'form');
-if(hashSetup) showSetup(hashSetup);
-else if(location.hash.indexOf('setup=') >= 0){ clearHash(); toast("Le lien de configuration est incomplet. Demandez-en un nouveau.", true); }
+const lastSent = hist()[0];
+show(lastSent && lastSent.statut === 'valide' && store.get('bi.showRecap', false) ? 'recap' : 'form');
+if(lastSent && lastSent.statut === 'valide' && store.get('bi.showRecap', false)) showRecap(lastSent.numero);
 
 // valeurs communes : config.json à la racine du dépôt (gardé en mémoire pour le hors ligne)
 fetch('config.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(c => {

@@ -20,7 +20,7 @@ Ouvrir une première fois avec du réseau : ensuite l'application fonctionne hor
 
 ## Mise à jour
 
-Remplacer `index.html` sur GitHub, et changer `bi-v4` en `bi-v5` dans `sw.js`
+Remplacer `index.html` sur GitHub, et changer `bi-v5` en `bi-v6` dans `sw.js`
 pour forcer le rafraîchissement du cache sur les appareils.
 
 ## Numérotation
@@ -38,4 +38,5 @@ pour forcer le rafraîchissement du cache sur les appareils.
   Le contenu du lien reste dans le navigateur (partie après #, jamais envoyée à GitHub).
 - iPhone : une appli installée sur l'écran d'accueil a son propre stockage, séparé de Safari.
   Si le technicien a installé l'appli avant d'ouvrir le lien, il colle le lien dans
-  Réglages > Lien de configuration.
+  l'écran « Accès réservé ».
+- Sans lien de configuration, l'appli affiche « Accès réservé » et ne permet pas de créer de bon.
