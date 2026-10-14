@@ -1,5 +1,5 @@
 // Cache hors ligne : l'application fonctionne sans réseau après une première ouverture.
-const CACHE = 'bi-v8';
+const CACHE = 'bi-v9';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png',
   'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
@@ -14,7 +14,8 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   // config.json : toujours le réseau (l'appli garde sa propre copie pour le hors ligne)
-  if (new URL(e.request.url).pathname.endsWith('/config.json')) return;
+  const pth = new URL(e.request.url).pathname;
+  if (pth.endsWith('/config.json') || pth.includes('/sauvegarde/')) return;
   const isPage = e.request.mode === 'navigate';
   e.respondWith(
     isPage

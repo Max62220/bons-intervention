@@ -41,7 +41,7 @@ h2{margin:0;font-size:11.5px;font-weight:600;letter-spacing:.09em;text-transform
 .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
 label.f{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:500;min-width:0}
 .req{color:var(--err)}
-input[type=text],input[type=email]{width:100%;min-height:44px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--field);font-size:16px}
+input[type=text],input[type=email],input[type=search],textarea{width:100%;min-height:44px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--field);font-size:16px}
 input:focus-visible,button:focus-visible,a:focus-visible{outline:2.5px solid var(--accent);outline-offset:1px}
 .check{display:flex;gap:10px;align-items:center;font-size:14px}
 .check input{width:20px;height:20px;accent-color:var(--accent)}
@@ -55,6 +55,13 @@ input:focus-visible,button:focus-visible,a:focus-visible{outline:2.5px solid var
 .qr img,.qr canvas{display:block;max-width:100%;height:auto}
 .empty{color:var(--muted);margin:0;font-size:14px}
 .list{display:flex;flex-direction:column;gap:6px}
+textarea{min-height:120px;font:13px var(--f-mono);resize:vertical}
+details>summary{cursor:pointer;list-style:none;font-weight:600;color:var(--accent);padding:4px 0}
+details>summary::-webkit-details-marker{display:none}
+details>summary::before{content:"+ "}
+details[open]>summary::before{content:"– "}
+details .body{display:flex;flex-direction:column;gap:10px;margin-top:8px}
+.pv{font:12px var(--f-mono);background:var(--field);border:1px solid var(--line);border-radius:8px;padding:8px 10px;overflow-x:auto;white-space:pre}
 .item{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:8px}
 .item b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .item span{display:block;font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
@@ -127,6 +134,42 @@ input:focus-visible,button:focus-visible,a:focus-visible{outline:2.5px solid var
         <p class="hint">Sur iPhone, si l'appli est déjà installée sur l'écran d'accueil, il copie le lien et le colle dans l'écran « Accès réservé » de l'appli.</p>
       </div>
     </div>
+    <div class="card" id="cl">
+      <h2>Clients (lieux d'intervention) <span id="clCount" class="ini" style="display:inline"></span></h2>
+      <p class="hint" id="clPub"></p>
+      <input type="search" id="clSearch" placeholder="Rechercher un client (nom, code, ville)…" aria-label="Rechercher un client">
+      <div class="list" id="clList"></div>
+      <details id="clFormBox">
+        <summary id="clFormTitle">Ajouter un client</summary>
+        <div class="body">
+          <label class="f">Nom du client <span class="req" aria-hidden="true">*</span><input type="text" id="c-nom" autocomplete="off"></label>
+          <div class="row">
+            <label class="f">Code client<input type="text" id="c-code" inputmode="numeric" autocomplete="off"></label>
+            <label class="f">Département<input type="text" id="c-dept" maxlength="3" autocomplete="off"></label>
+          </div>
+          <label class="f">Site / bâtiment<input type="text" id="c-site" autocomplete="off"></label>
+          <label class="f">Rue<input type="text" id="c-rue" autocomplete="off"></label>
+          <div class="row">
+            <label class="f">Code postal<input type="text" id="c-cp" inputmode="numeric" maxlength="5" autocomplete="off"></label>
+            <label class="f">Ville<input type="text" id="c-ville" autocomplete="off"></label>
+          </div>
+          <div class="row">
+            <label class="f">Contact sur place<input type="text" id="c-contact" autocomplete="off"></label>
+            <label class="f">E-mail du client<input type="email" id="c-email" autocomplete="off"></label>
+          </div>
+          <div class="btns"><button type="button" class="btn primary" id="cSave">Enregistrer le client</button><button type="button" class="btn" id="cCancel">Annuler</button></div>
+        </div>
+      </details>
+      <details id="clImportBox">
+        <summary>Importer depuis Excel</summary>
+        <div class="body">
+          <p class="hint">Dans Excel, sélectionnez les lignes <strong>avec la ligne d'en-tête</strong> (par ex. colonnes F à M de l'onglet « Clients » de la Base article), copiez, puis collez ici. Colonnes reconnues : code client (BP Sold to), nom (BP Sold to Name1), rue (Street), n° (Haus Number), code postal (Post Code), ville (City), département, contact, e-mail. Sans en-tête, l'ordre attendu est : code, nom, rue, code postal, ville.</p>
+          <textarea id="clPaste" spellcheck="false" placeholder="Collez ici les cellules copiées depuis Excel"></textarea>
+          <div class="btns"><button type="button" class="btn" id="clAnalyse">Analyser</button><button type="button" class="btn primary" id="clImport" disabled>Importer</button></div>
+          <div class="pv" id="clPreview" hidden></div>
+        </div>
+      </details>
+    </div>
   </div>
 </main>
 <datalist id="entreprises"></datalist>
@@ -181,8 +224,9 @@ function check(o){
   if(bad.length) e.push('adresse invalide : ' + bad.join(', '));
   return e;
 }
+const linkFor = o => appUrl + '#setup=' + encode({ ...o, ck: clientsKey() });
 function render(o){
-  const link = appUrl + '#setup=' + encode(o), who = o.prenom + ' ' + o.nom;
+  const link = linkFor(o), who = o.prenom + ' ' + o.nom;
   $('#outEmpty').hidden = true; $('#outBox').hidden = false;
   $('#outWho').textContent = who + ' · ' + o.entreprise;
   $('#link').textContent = link;
@@ -198,7 +242,7 @@ function render(o){
 function renderList(){
   const l = get();
   $('#list').innerHTML = l.length ? l.map((o,i) => `<div class="item"><div style="min-width:0"><b><span class="ini" style="display:inline">${esc(o.initiales)}</span>${esc(o.prenom + ' ' + o.nom)}</b><span>${esc(o.entreprise)}</span><span>Tech : ${esc(o.email || 'e-mail non renseigné')}</span><span>Bons envoyés à : ${esc(o.dest)}${o.cc ? ' (Cc ' + esc(o.cc) + ')' : ''}</span></div>
-    <span style="display:flex;gap:6px"><a class="btn small" href="${esc(appUrl + '#setup=' + encode(o))}" target="_blank" rel="noopener">Créer un bon</a><button type="button" class="btn small" data-open="${i}">Lien</button></span><button type="button" class="btn small" data-del="${i}" aria-label="Retirer">✕</button></div>`).join('')
+    <span style="display:flex;gap:6px"><a class="btn small" href="${esc(linkFor(o))}" target="_blank" rel="noopener">Créer un bon</a><button type="button" class="btn small" data-open="${i}">Lien</button></span><button type="button" class="btn small" data-del="${i}" aria-label="Retirer">✕</button></div>`).join('')
     : '<p class="empty">Aucun technicien pour l’instant. Cette liste reste sur ce poste uniquement.</p>';
 }
 $('#gen').onclick = () => {
@@ -225,8 +269,6 @@ $('#list').addEventListener('click', e => {
   if(o){ fill(l[+o.dataset.open]); render(l[+o.dataset.open]); }
   if(d){ l.splice(+d.dataset.del, 1); put(l); renderList(); }
 });
-renderList();
-
 /* ---------- sauvegarde chiffrée (AES-GCM 256, clé PBKDF2-SHA256) dans un dépôt GitHub privé ---------- */
 const BK = 'bi.admin.backup', FILE = 'sauvegarde/techniciens.enc';
 // dépôt déduit de l'adresse : https://<compte>.github.io/<depot>/admin.html
@@ -251,9 +293,9 @@ async function decryptList(text, pass){
   const pt = await crypto.subtle.decrypt({ name:'AES-GCM', iv:unb64(o.iv) }, await deriveKey(pass, unb64(o.salt)), unb64(o.data));
   return JSON.parse(td.decode(pt));
 }
-async function gh(method, body){
+async function gh(method, body, file){
   const c = bkCfg();
-  const r = await fetch('https://api.github.com/repos/' + c.repo + '/contents/' + FILE, {
+  const r = await fetch('https://api.github.com/repos/' + c.repo + '/contents/' + (file || FILE), {
     method, headers: { 'Authorization':'Bearer ' + c.token, 'Accept':'application/vnd.github+json', 'X-GitHub-Api-Version':'2022-11-28' },
     body: body ? JSON.stringify(body) : undefined, cache:'no-store' });
   if(method === 'GET' && r.status === 404) return null;
@@ -299,7 +341,7 @@ async function backupNow(){
   if(!bkKeyPass) return;
   try {
     bkStatus('Sauvegarde en cours…');
-    const text = await encryptList(get(), bkKeyPass);
+    const text = await encryptList({ techniciens: get(), clientsKey: clientsKey() }, bkKeyPass);
     if(bkSha === null) await readRemote().catch(() => null);
     const res = await gh('PUT', { message:'Sauvegarde liste techniciens', content: btoa(text), ...(bkSha ? { sha: bkSha } : {}) });
     bkSha = res.content.sha;
@@ -318,7 +360,8 @@ $('#bkUnlock').onclick = async () => {
     bkStatus('Connexion à GitHub…');
     const remote = await readRemote();
     if(remote){
-      let list; try { list = await decryptList(remote, pass); } catch(e){ bkStatus('Mot de passe incorrect pour la sauvegarde existante.', false); return; }
+      let payload; try { payload = await decryptList(remote, pass); } catch(e){ bkStatus('Mot de passe incorrect pour la sauvegarde existante.', false); return; }
+      const list = await adoptPayload(payload);
       // fusion : on garde la version locale en cas de doublon (même prénom + nom)
       const local = get(), keyOf = o => (o.prenom + '|' + o.nom).toLowerCase();
       const seen = new Set(local.map(keyOf)), merged = local.concat(list.filter(o => !seen.has(keyOf(o))));
@@ -336,7 +379,8 @@ $('#bkRestore').onclick = async () => {
   try {
     const remote = await readRemote();
     if(!remote){ bkStatus('Aucune sauvegarde trouvée dans ce dépôt.', false); return; }
-    let list; try { list = await decryptList(remote, pass); } catch(e){ bkStatus('Mot de passe incorrect.', false); return; }
+    let payload; try { payload = await decryptList(remote, pass); } catch(e){ bkStatus('Mot de passe incorrect.', false); return; }
+    const list = await adoptPayload(payload);
     try { localStorage.setItem(K, JSON.stringify(list)); } catch(e){}
     renderList(); bkKeyPass = pass; $('#bkPass').value = ''; bkRender();
     bkStatus('Liste restaurée depuis GitHub : ' + list.length + ' technicien(s).');
@@ -344,6 +388,142 @@ $('#bkRestore').onclick = async () => {
 };
 $('#bkEdit').onclick = () => { $('#bkSetup').hidden = false; $('#bkEdit').hidden = true; $('#bkToken').value = ''; bkKeyPass = null; bkRender(); $('#bkSetup').hidden = false; };
 $('#bkPass').addEventListener('keydown', e => { if(e.key === 'Enter') $('#bkUnlock').click(); });
+/* ---------- clients : liste chiffrée avec une clé aléatoire, transmise aux techniciens dans leur lien ---------- */
+const KC = 'bi.admin.clients', KCK = 'bi.admin.ck', CLFILE = 'sauvegarde/clients.enc';
+const b64u = u8 => b64(u8).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const unb64u = s => { s = s.replace(/-/g,'+').replace(/_/g,'/'); while(s.length % 4) s += '='; return unb64(s); };
+function clientsKey(){
+  let k = localStorage.getItem(KCK);
+  if(!k){ k = b64u(crypto.getRandomValues(new Uint8Array(32))); try { localStorage.setItem(KCK, k); } catch(e){} }
+  return k;
+}
+const getCl = () => { try { return JSON.parse(localStorage.getItem(KC)) || []; } catch(e){ return []; } };
+const putCl = l => { try { localStorage.setItem(KC, JSON.stringify(l)); } catch(e){ toast('Mémoire du navigateur pleine.'); } renderCl(); publishSoon(); };
+const rawKey = k => crypto.subtle.importKey('raw', unb64u(k), 'AES-GCM', false, ['encrypt','decrypt']);
+async function encClients(list, k){
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name:'AES-GCM', iv }, await rawKey(k), te.encode(JSON.stringify(list))));
+  return JSON.stringify({ v:1, alg:'AES-GCM-256', iv:b64(iv), data:b64(ct), n:list.length, date:new Date().toISOString() });
+}
+async function decClients(text, k){
+  const o = JSON.parse(text);
+  return JSON.parse(td.decode(await crypto.subtle.decrypt({ name:'AES-GCM', iv:unb64(o.iv) }, await rawKey(k), unb64(o.data))));
+}
+const clKey = c => (c.code ? 'c:' + c.code : 'n:' + (c.nom + '|' + (c.ville || '') + '|' + (c.site || '')).toLowerCase());
+function mergeCl(base, add){
+  const m = new Map(base.map(c => [clKey(c), c]));
+  add.forEach(c => m.set(clKey(c), { ...(m.get(clKey(c)) || {}), ...Object.fromEntries(Object.entries(c).filter(([, v]) => v !== '' && v != null)) }));
+  return [...m.values()].sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
+}
+// reprise d'une sauvegarde admin (ancien format = tableau de techniciens)
+async function adoptPayload(p){
+  if(Array.isArray(p)) return p;
+  if(p.clientsKey && p.clientsKey !== localStorage.getItem(KCK)){
+    try { localStorage.setItem(KCK, p.clientsKey); } catch(e){}
+    clSha = null;
+  }
+  try {
+    const j = await gh('GET', null, CLFILE);
+    if(j){ clSha = j.sha; const remote = await decClients(td.decode(unb64(j.content)), clientsKey()); try { localStorage.setItem(KC, JSON.stringify(mergeCl(remote, getCl()))); } catch(e){} renderCl(); }
+  } catch(e){ /* pas de liste clients publiée */ }
+  return p.techniciens || [];
+}
+let clSha = null, pubTimer = null;
+function publishSoon(){ clearTimeout(pubTimer); pubTimer = setTimeout(publishClients, 900); }
+async function publishClients(){
+  const c = bkCfg();
+  if(!(c.repo && c.token)){ $('#clPub').textContent = 'Liste non publiée : configurez la sauvegarde GitHub (jeton) ci-contre pour la rendre disponible aux techniciens.'; $('#clPub').style.color = 'var(--err)'; return; }
+  try {
+    $('#clPub').textContent = 'Publication de la liste pour les techniciens…'; $('#clPub').style.color = '';
+    const text = await encClients(getCl(), clientsKey());
+    if(clSha === null){ const j = await gh('GET', null, CLFILE).catch(() => null); clSha = j ? j.sha : null; }
+    const res = await gh('PUT', { message:'Liste clients (chiffrée)', content: btoa(text), ...(clSha ? { sha: clSha } : {}) }, CLFILE);
+    clSha = res.content.sha;
+    $('#clPub').textContent = 'Liste chiffrée publiée le ' + new Date().toLocaleString('fr-FR') + ' : les techniciens la reçoivent à la prochaine ouverture de l\'appli (délai GitHub ~1 min).';
+  } catch(e){ clSha = null; $('#clPub').textContent = 'Publication impossible : ' + e.message + '.'; $('#clPub').style.color = 'var(--err)'; }
+}
+function deptOf(cp){
+  cp = String(cp || '').trim(); if(!/^\d{5}$/.test(cp)) return '';
+  if(/^9[78]/.test(cp)) return cp.slice(0, 3);
+  if(cp.startsWith('20')) return +cp < 20200 ? '2A' : '2B';
+  return cp.slice(0, 2);
+}
+let clEdit = null;
+function renderCl(){
+  const all = getCl(), q = $('#clSearch').value.trim().toLowerCase();
+  const hit = q ? all.filter(c => [c.nom, c.code, c.ville, c.site, c.cp].join(' ').toLowerCase().includes(q)) : all;
+  $('#clCount').textContent = all.length;
+  const shown = hit.slice(0, 40);
+  $('#clList').innerHTML = shown.map(c => `<div class="item"><div style="min-width:0"><b>${esc(c.nom)}</b><span>${esc([c.code ? 'Code ' + c.code : '', c.dept ? 'dépt ' + c.dept : '', c.site, [c.cp, c.ville].filter(Boolean).join(' ')].filter(Boolean).join(' · '))}</span>${c.contact || c.email ? `<span>${esc([c.contact, c.email].filter(Boolean).join(' · '))}</span>` : ''}</div>
+    <button type="button" class="btn small" data-cedit="${esc(clKey(c))}">Modifier</button><button type="button" class="btn small" data-cdel="${esc(clKey(c))}" aria-label="Supprimer">✕</button></div>`).join('')
+    + (hit.length > shown.length ? `<p class="empty">… et ${hit.length - shown.length} autre(s) : affinez la recherche.</p>` : '')
+    + (!all.length ? '<p class="empty">Aucun client. Ajoutez-en un ou importez une liste depuis Excel.</p>' : !hit.length ? '<p class="empty">Aucun client ne correspond.</p>' : '');
+}
+const CF = ['nom','code','dept','site','rue','cp','ville','contact','email'];
+function fillCl(c){ CF.forEach(k => $('#c-' + k).value = (c && c[k]) || ''); }
+$('#clSearch').addEventListener('input', renderCl);
+$('#c-cp').addEventListener('input', e => { if(!$('#c-dept').value || $('#c-dept').dataset.auto){ $('#c-dept').value = deptOf(e.target.value); $('#c-dept').dataset.auto = '1'; } });
+$('#c-dept').addEventListener('input', e => { delete e.target.dataset.auto; });
+$('#cSave').onclick = () => {
+  const c = {}; CF.forEach(k => c[k] = $('#c-' + k).value.trim());
+  if(!c.nom){ toast('Le nom du client est obligatoire.'); return; }
+  if(c.email && !EMAIL_RE.test(c.email)){ toast('E-mail du client invalide.'); return; }
+  c.dept = c.dept.toUpperCase() || deptOf(c.cp);
+  let l = getCl(); if(clEdit) l = l.filter(x => clKey(x) !== clEdit);
+  putCl(mergeCl(l, [c])); clEdit = null; fillCl(null); $('#clFormTitle').textContent = 'Ajouter un client'; $('#clFormBox').open = false;
+  toast('Client enregistré.');
+};
+$('#cCancel').onclick = () => { clEdit = null; fillCl(null); $('#clFormTitle').textContent = 'Ajouter un client'; $('#clFormBox').open = false; };
+let delArm = null;
+$('#clList').addEventListener('click', e => {
+  const ed = e.target.closest('[data-cedit]'), dl = e.target.closest('[data-cdel]');
+  if(ed){ const c = getCl().find(x => clKey(x) === ed.dataset.cedit); clEdit = ed.dataset.cedit; fillCl(c); $('#clFormTitle').textContent = 'Modifier : ' + c.nom; $('#clFormBox').open = true; $('#c-nom').focus(); }
+  if(dl){
+    if(delArm !== dl.dataset.cdel){ delArm = dl.dataset.cdel; dl.textContent = 'Confirmer'; setTimeout(() => { if(delArm === dl.dataset.cdel){ delArm = null; renderCl(); } }, 3000); return; }
+    delArm = null; putCl(getCl().filter(x => clKey(x) !== dl.dataset.cdel)); toast('Client supprimé.');
+  }
+});
+/* import par copier-coller depuis Excel */
+const HDR = { code:/^(bp sold to|code client|code|n° ?client|num[ée]ro client|customer( \(sold-to\))?)$/i, nom:/^(bp sold to name ?1|nom|client|soci[ée]t[ée]|raison sociale|name|nom client)$/i,
+  rue:/^(street|rue|adresse|address)$/i, num:/^(haus number|house number|n°|num[ée]ro)$/i, cp:/^(post ?code|code postal|cp)$/i, ville:/^(city|ville|city \/ district|commune)$/i,
+  dept:/^(dpt|d[ée]partement|dept)$/i, contact:/^(contact|interlocuteur)$/i, email:/^(e-?mail|mail|courriel)$/i, site:/^(site|b[âa]timent)$/i };
+let clParsed = [];
+function parsePaste(text){
+  const rows = text.split(/\r?\n/).filter(r => r.trim()).map(r => r.split('\t').map(x => x.trim()));
+  if(!rows.length) return { list:[], map:null };
+  const map = {}; rows[0].forEach((h, i) => { for(const [k, re] of Object.entries(HDR)) if(!(k in map) && re.test(h)) { map[k] = i; break; } });
+  const hasHeader = 'nom' in map || 'code' in map;
+  const m = hasHeader ? map : { code:0, nom:1, rue:2, cp:3, ville:4 };
+  const body = hasHeader ? rows.slice(1) : rows;
+  const g = (r, k) => k in m ? (r[m[k]] || '').trim() : '';
+  const list = body.map(r => {
+    const cp = g(r, 'cp').replace(/\D/g, '').padStart(5, '0').slice(-5), num = g(r, 'num');
+    const c = { nom:g(r, 'nom'), code:g(r, 'code').replace(/\.0$/, ''), rue:(num ? num + ' ' : '') + g(r, 'rue'), cp: g(r, 'cp') ? cp : '', ville:g(r, 'ville'),
+      dept:(g(r, 'dept') || deptOf(cp)).toUpperCase(), contact:g(r, 'contact'), email:g(r, 'email'), site:g(r, 'site') };
+    c.nom = c.nom.replace(/^#\s*/, '');
+    return c;
+  }).filter(c => c.nom);
+  return { list, map: hasHeader ? Object.keys(map) : null };
+}
+$('#clAnalyse').onclick = () => {
+  const { list, map } = parsePaste($('#clPaste').value); clParsed = list;
+  const existing = new Set(getCl().map(clKey)), upd = list.filter(c => existing.has(clKey(c))).length;
+  $('#clPreview').hidden = false;
+  $('#clPreview').textContent = list.length
+    ? `${list.length} client(s) détecté(s) : ${list.length - upd} nouveau(x), ${upd} mis à jour.\n` + (map ? 'Colonnes reconnues : ' + map.join(', ') : 'Pas d\'en-tête reconnu : ordre code, nom, rue, code postal, ville.') + '\n\n'
+      + list.slice(0, 5).map(c => [c.code, c.nom, c.rue, c.cp, c.ville, c.dept ? 'dépt ' + c.dept : ''].filter(Boolean).join(' | ')).join('\n') + (list.length > 5 ? '\n…' : '')
+    : 'Aucun client reconnu. Vérifiez que la ligne d\'en-tête est incluse et que la colonne du nom est présente.';
+  $('#clImport').disabled = !list.length;
+};
+$('#clImport').onclick = () => {
+  if(!clParsed.length) return;
+  putCl(mergeCl(getCl(), clParsed)); toast(clParsed.length + ' client(s) importé(s).');
+  clParsed = []; $('#clPaste').value = ''; $('#clPreview').hidden = true; $('#clImport').disabled = true; $('#clImportBox').open = false;
+};
+renderList(); renderCl();
+if(getCl().length && !(bkCfg().repo && bkCfg().token)) publishClients();
+else if(getCl().length) $('#clPub').textContent = 'Les modifications sont publiées automatiquement (chiffrées) pour les techniciens.';
+
 bkRender();
 if(bkCfg().repo) bkStatus('Saisissez votre mot de passe puis « Activer la sauvegarde » : la liste sera synchronisée avec GitHub.');
 </script>

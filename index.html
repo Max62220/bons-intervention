@@ -142,7 +142,7 @@ dl.sum dd{margin:0;overflow-wrap:anywhere}
   <div class="card">
     <h2>Client</h2>
     <div class="row">
-      <label class="f">Client <span class="req" aria-hidden="true">*</span><input type="text" id="f-client" autocomplete="off"></label>
+      <label class="f">Client <span class="req" aria-hidden="true">*</span><input type="text" id="f-client" list="clientsList" autocomplete="off" placeholder="Tapez le nom ou le code client"></label>
       <label class="f">Site / bâtiment<input type="text" id="f-site" autocomplete="off"></label>
     </div>
     <div class="row">
@@ -263,6 +263,7 @@ dl.sum dd{margin:0;overflow-wrap:anywhere}
 </main>
 
 <datalist id="entreprises"></datalist>
+<datalist id="clientsList"></datalist>
 <div id="toast" role="status" aria-live="polite"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -674,6 +675,37 @@ $('#aCopy').onclick = () => { const {to, cc} = recipients(cur); copyText(to.conc
 $('#aSent').onclick = () => { markSent(); toast('Bon marqué comme envoyé.'); };
 $('#aNew').onclick = () => { store.set('bi.showRecap', false); show('form'); };
 
+/* ---------- liste des clients (chiffrée, clé reçue dans le lien de configuration) ---------- */
+const K_CL = 'bi.clients';
+let CLIENTS = store.get(K_CL, []);
+const unb64u = t => { t = t.replace(/-/g,'+').replace(/_/g,'/'); while(t.length % 4) t += '='; return Uint8Array.from(atob(t), c => c.charCodeAt(0)); };
+async function loadClients(){
+  const k = rawSettings().ck; if(!k || !window.crypto || !crypto.subtle) return;
+  try {
+    const r = await fetch('sauvegarde/clients.enc', { cache:'no-store' }); if(!r.ok) return;
+    const o = await r.json();
+    const key = await crypto.subtle.importKey('raw', unb64u(k), 'AES-GCM', false, ['decrypt']);
+    const pt = await crypto.subtle.decrypt({ name:'AES-GCM', iv: unb64u(o.iv) }, key, unb64u(o.data));
+    CLIENTS = JSON.parse(new TextDecoder().decode(pt)); store.set(K_CL, CLIENTS);
+  } catch(e){ /* hors ligne ou clé obsolète : on garde la dernière liste reçue */ }
+}
+const cliLabel = c => c.nom + (c.code ? ' — ' + c.code : '') + (c.ville || c.site ? ' — ' + [c.site, c.ville].filter(Boolean).join(', ') : '');
+function suggestClients(q){
+  q = q.trim().toLowerCase();
+  const hit = (q ? CLIENTS.filter(c => [c.nom, c.code, c.ville, c.site].join(' ').toLowerCase().includes(q)) : CLIENTS).slice(0, 30);
+  $('#clientsList').innerHTML = hit.map(c => '<option value="' + esc(cliLabel(c)) + '">').join('');
+}
+$('#f-client').addEventListener('input', e => {
+  const v = e.target.value, c = CLIENTS.find(x => cliLabel(x) === v);
+  if(!c){ suggestClients(v); return; }
+  e.target.value = c.nom;
+  Object.assign(draft, { client: c.nom, codeClient: c.code || '', departement: c.dept || '', site: c.site || draft.site,
+    adresse: [c.rue, [c.cp, c.ville].filter(Boolean).join(' ')].filter(Boolean).join('\n'),
+    contact: c.contact || draft.contact, clientEmail: c.email || draft.clientEmail });
+  ['codeClient','departement','site','adresse','contact','clientEmail'].forEach(k => $('#f-' + k).value = draft[k] || '');
+  saveDraft(); toast('Client ' + c.nom + ' renseigné.');
+});
+
 /* ---------- configuration (uniquement par lien) ---------- */
 function applySettings(s){
   if(!store.set(K_SET, s)) return false;
@@ -691,7 +723,7 @@ function decodeSetup(txt){
     code = code.split(/[&\s]/)[0].replace(/-/g,'+').replace(/_/g,'/'); while(code.length % 4) code += '=';
     const o = JSON.parse(decodeURIComponent(escape(atob(code))));
     if(!o || !o.prenom || !o.nom || !o.dest) return null;
-    const keep = ['prenom','nom','initiales','email','entreprise','dest','cc'], s = {};
+    const keep = ['prenom','nom','initiales','email','entreprise','dest','cc','ck'], s = {};
     keep.forEach(k => s[k] = String(o[k] || '').trim().slice(0, 200));
     s.initiales = (s.initiales || initialsOf(s.prenom, s.nom)).toUpperCase().replace(/[^A-Z]/g,'').slice(0,4);
     s.ccSelf = !!o.ccSelf; return s;
@@ -701,7 +733,7 @@ const configured = () => { const s = rawSettings(); return !!(s.prenom && s.nom 
 $('#lImport').onclick = () => {
   const s = decodeSetup($('#l-import').value);
   if(!s){ toast("Ce lien n'est pas un lien de configuration valide. Demandez-en un nouveau à votre responsable.", true); return; }
-  if(applySettings(s)){ $('#l-import').value = ''; toast('Application configurée pour ' + s.prenom + ' ' + s.nom + '.'); show('form'); }
+  if(applySettings(s)){ $('#l-import').value = ''; toast('Application configurée pour ' + s.prenom + ' ' + s.nom + '.'); show('form'); loadClients().then(() => suggestClients('')); }
 };
 function updWho(){ const s = settings(); $('#who').textContent = s.prenom ? s.prenom + ' ' + s.nom + (s.entreprise ? ' · ' + s.entreprise : '') : 'Application non configurée'; }
 function fillEntreprises(){
@@ -727,6 +759,7 @@ if(location.hash.indexOf('setup=') >= 0){
   } else toast("Le lien de configuration est incomplet. Demandez-en un nouveau à votre responsable.", true);
 }
 updWho(); fillEntreprises();
+suggestClients(''); loadClients().then(() => suggestClients($('#f-client').value));
 const lastSent = hist()[0];
 show(lastSent && lastSent.statut === 'valide' && store.get('bi.showRecap', false) ? 'recap' : 'form');
 if(lastSent && lastSent.statut === 'valide' && store.get('bi.showRecap', false)) showRecap(lastSent.numero);
