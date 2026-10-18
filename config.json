@@ -5,5 +5,23 @@
   "entreprises": [
     "Prestataire A",
     "Prestataire B"
-  ]
+  ],
+  "types": [
+    "Réparation",
+    "Vérification",
+    "Mise en route",
+    "Installation",
+    "Formation",
+    "Contrat maintenance",
+    "Contrat mise à disposition",
+    "Contrat location",
+    "Garantie",
+    "Autre"
+  ],
+  "entete": {
+    "nom": "",
+    "adresse": "10 avenue Aristide Briand\n92220 Bagneux",
+    "tel": "",
+    "email": ""
+  }
 }
