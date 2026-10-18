@@ -1,9 +1,11 @@
 // Cache hors ligne : l'application fonctionne sans réseau après une première ouverture.
-const CACHE = 'bi-v10';
+const CACHE = 'bi-v14';
 const ASSETS = [
-  './', './index.html', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png',
-  'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js'
+  './', './index.html', './manifest.webmanifest', './icon.svg', './logo.png', './icon-192.png', './icon-512.png',
+  './lib/jspdf.umd.min.js', './lib/jspdf.plugin.autotable.min.js',
+  './fonts/ibm-plex-sans-latin-400-normal.woff2', './fonts/ibm-plex-sans-latin-500-normal.woff2',
+  './fonts/ibm-plex-sans-latin-600-normal.woff2', './fonts/ibm-plex-sans-latin-700-normal.woff2',
+  './fonts/ibm-plex-mono-latin-500-normal.woff2', './fonts/ibm-plex-mono-latin-600-normal.woff2'
 ];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));

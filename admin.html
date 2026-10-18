@@ -7,10 +7,15 @@
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#0b6e6e">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-1WxOQ7tC/cRHy1C0hH4MkANxRjTrKsXG55uaxtP2xD0='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://api.github.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <style>
+/* polices hébergées dans le dépôt (aucun appel à Google Fonts) — IBM Plex, licence SIL OFL */
+@font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/ibm-plex-sans-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:500;font-display:swap;src:url(fonts/ibm-plex-sans-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:600;font-display:swap;src:url(fonts/ibm-plex-sans-latin-600-normal.woff2) format("woff2")}
+@font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:700;font-display:swap;src:url(fonts/ibm-plex-sans-latin-700-normal.woff2) format("woff2")}
+@font-face{font-family:"IBM Plex Mono";font-style:normal;font-weight:500;font-display:swap;src:url(fonts/ibm-plex-mono-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:"IBM Plex Mono";font-style:normal;font-weight:600;font-display:swap;src:url(fonts/ibm-plex-mono-latin-600-normal.woff2) format("woff2")}
 /* Poste du responsable : formulaire à gauche, lien + QR à droite (empilés sur mobile) */
 :root{
   --bg:#eef2f3; --surface:#ffffff; --field:#f6f8f9; --ink:#14212b; --muted:#5b6a74; --line:#d3dbdf;
@@ -81,6 +86,7 @@ details .body{display:flex;flex-direction:column;gap:10px;margin-top:8px}
     <h2 id="lockTitle">Page d'administration verrouillée</h2>
     <p class="hint" id="lockText">Saisissez votre mot de passe administrateur.</p>
     <label class="f">Mot de passe<input type="password" id="lkPass" autocomplete="current-password" required></label>
+    <p class="hint" id="lkStrength" hidden></p>
     <label class="f" id="lkConfirmWrap" hidden>Confirmez le mot de passe<input type="password" id="lkPass2" autocomplete="new-password"></label>
     <button type="submit" class="btn primary" id="lkGo">Déverrouiller</button>
     <p class="hint" id="lkMsg" role="alert"></p>
@@ -126,6 +132,15 @@ details .body{display:flex;flex-direction:column;gap:10px;margin-top:8px}
         <button type="button" class="btn small" id="bkEdit">Modifier dépôt / jeton</button>
       </div>
       <p class="hint" id="bkMsg"></p>
+      <details id="htBox">
+        <summary>Historique des techniciens : jeton « Issues »</summary>
+        <div class="body">
+          <p class="hint">Second jeton GitHub, transmis dans les liens des techniciens : limité à ce dépôt et à la permission <strong>Issues : Read and write</strong> (aucun accès aux fichiers de l'appli). Les tickets (Issues) doivent être activés sur le dépôt.</p>
+          <label class="f">Jeton historique<input type="password" id="htToken" autocomplete="off" spellcheck="false" placeholder="github_pat_…"></label>
+          <div class="btns"><button type="button" class="btn small" id="htSave">Enregistrer le jeton</button></div>
+          <p class="hint" id="htMsg"></p>
+        </div>
+      </details>
     </div>
   </div>
   <div class="col">
@@ -146,6 +161,38 @@ details .body{display:flex;flex-direction:column;gap:10px;margin-top:8px}
         <p class="hint">Sur place, le technicien peut aussi scanner ce QR code avec l'appareil photo de son téléphone.</p>
         <p class="hint">Sur iPhone, si l'appli est déjà installée sur l'écran d'accueil, il copie le lien et le colle dans l'écran « Accès réservé » de l'appli.</p>
       </div>
+    </div>
+    <div class="card" id="hc">
+      <h2>Historique des bons <span id="hcCount" class="ini" style="display:inline"></span></h2>
+      <div class="row">
+        <label class="f">Technicien<select id="hcTech" style="min-height:44px;border:1px solid var(--line);border-radius:8px;background:var(--field);font-size:15px;padding:8px"><option value="">Tous</option></select></label>
+        <label class="f">Rechercher<input type="search" id="hcSearch" placeholder="client, n°, type…"></label>
+      </div>
+      <div class="btns"><button type="button" class="btn" id="hcLoad">Charger l'historique</button></div>
+      <p class="hint" id="hcMsg"></p>
+      <div class="list" id="hcList"></div>
+    </div>
+    <div class="card" id="pf">
+      <h2>Paramètres des bons</h2>
+      <p class="hint">Enregistrés dans config.json sur GitHub (non chiffré : ne mettez ici rien de confidentiel). Les techniciens les reçoivent à la prochaine ouverture de l'appli.</p>
+      <label class="f">Types d'intervention (un par ligne, dans l'ordre d'affichage)<textarea id="pfTypes" spellcheck="false" style="min-height:170px;font-family:var(--f-sans);font-size:15px"></textarea></label>
+      <details id="pfHead">
+        <summary>En-tête de la fiche PDF</summary>
+        <div class="body">
+          <label class="f">Nom affiché (si pas de logo)<input type="text" id="pfNom" autocomplete="off"></label>
+          <label class="f">Adresse (2 lignes max)<textarea id="pfAdresse" style="min-height:60px;font-family:var(--f-sans);font-size:15px"></textarea></label>
+          <div class="row">
+            <label class="f">Téléphone<input type="text" id="pfTel" autocomplete="off"></label>
+            <label class="f">E-mail<input type="email" id="pfMail" autocomplete="off"></label>
+          </div>
+          <div class="f" style="font-size:13px;font-weight:500">Logo (PNG ou JPEG)
+            <div class="btns" style="margin-top:6px"><label class="btn small" style="position:relative">Choisir une image<input type="file" id="pfLogoIn" accept="image/png,image/jpeg" style="position:absolute;inset:0;opacity:0;cursor:pointer"></label><button type="button" class="btn small" id="pfLogoDel">Retirer le logo</button></div>
+            <img id="pfLogo" alt="Aperçu du logo" style="max-height:48px;margin-top:8px" hidden>
+          </div>
+        </div>
+      </details>
+      <div class="btns"><button type="button" class="btn primary" id="pfSave">Publier les paramètres</button></div>
+      <p class="hint" id="pfMsg"></p>
     </div>
     <div class="card" id="cl">
       <h2>Clients (lieux d'intervention) <span id="clCount" class="ini" style="display:inline"></span></h2>
@@ -188,7 +235,7 @@ details .body{display:flex;flex-direction:column;gap:10px;margin-top:8px}
 <datalist id="entreprises"></datalist>
 <div id="toast" role="status" aria-live="polite"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="lib/qrcode.min.js"></script>
 <script>
 "use strict";
 const $ = s => document.querySelector(s);
@@ -251,7 +298,9 @@ function check(o){
   if(bad.length) e.push('adresse invalide : ' + bad.join(', '));
   return e;
 }
-const linkFor = o => appUrl + '#setup=' + encode({ ...o, ck: clientsKey() });
+const rnd64 = n => b64u(crypto.getRandomValues(new Uint8Array(n)));
+function withKeys(o){ if(!o.hid) o.hid = rnd64(6); if(!o.hk) o.hk = rnd64(32); return o; }
+const linkFor = o => appUrl + '#setup=' + encode({ ...o, ck: clientsKey(), ...(VAULT.ht ? { ht: VAULT.ht } : {}) });
 function render(o){
   const link = linkFor(o), who = o.prenom + ' ' + o.nom;
   $('#outEmpty').hidden = true; $('#outBox').hidden = false;
@@ -276,6 +325,8 @@ $('#gen').onclick = () => {
   const o = read(), e = check(o);
   if(e.length){ $('#err').textContent = 'À compléter : ' + e.join(' ; ') + '.'; $('#err').hidden = false; return; }
   $('#err').hidden = true;
+  const prev = get().find(x => x.prenom === o.prenom && x.nom === o.nom);
+  if(prev){ o.hid = prev.hid; o.hk = prev.hk; } withKeys(o);   // même technicien = mêmes clés d'historique
   const l = get().filter(x => !(x.prenom === o.prenom && x.nom === o.nom)); l.unshift(o); put(l);
   render(o); renderList();
   if(typeof bkKeyPass !== 'undefined' && bkKeyPass){ toast('Lien créé. Sauvegarde sur GitHub en cours…'); }
@@ -294,7 +345,8 @@ $('#copy').onclick = () => {
 $('#list').addEventListener('click', e => {
   const o = e.target.closest('[data-open]'), d = e.target.closest('[data-del]'), l = get();
   if(o){ fill(l[+o.dataset.open]); render(l[+o.dataset.open]); }
-  if(d){ l.splice(+d.dataset.del, 1); put(l); renderList(); }
+  if(d){ const gone = l[+d.dataset.del]; if(gone && gone.hk){ VAULT.oldKeys = { ...(VAULT.oldKeys || {}), [gone.hid]: { hk: gone.hk, nom: gone.prenom + ' ' + gone.nom } }; }   // l'historique reste lisible
+    l.splice(+d.dataset.del, 1); put(l); renderList(); }
 });
 /* ---------- sauvegarde chiffrée (AES-GCM 256, clé PBKDF2-SHA256) dans un dépôt GitHub privé ---------- */
 const BK = 'bi.admin.backup', FILE = 'sauvegarde/techniciens.enc';
@@ -368,7 +420,7 @@ async function backupNow(){
   if(!bkKeyPass) return;
   try {
     bkStatus('Sauvegarde en cours…');
-    const text = await encryptList({ techniciens: get(), clientsKey: clientsKey(), repo: VAULT.repo, token: VAULT.token }, bkKeyPass);
+    const text = await encryptList({ techniciens: get(), clientsKey: clientsKey(), repo: VAULT.repo, token: VAULT.token, ht: VAULT.ht || '', oldKeys: VAULT.oldKeys || {} }, bkKeyPass);
     if(bkSha === null) await readRemote().catch(() => null);
     const res = await gh('PUT', { message:'Sauvegarde liste techniciens', content: btoa(text), ...(bkSha ? { sha: bkSha } : {}) });
     bkSha = res.content.sha;
@@ -446,6 +498,8 @@ function mergeCl(base, add){
 async function adoptPayload(p){
   if(Array.isArray(p)) return p;
   if(p.token && !VAULT.token){ VAULT.repo = p.repo || VAULT.repo; VAULT.token = p.token; saveVault(); bkRender(); }
+  if(p.ht && !VAULT.ht){ VAULT.ht = p.ht; saveVault(); }
+  if(p.oldKeys){ VAULT.oldKeys = { ...p.oldKeys, ...(VAULT.oldKeys || {}) }; saveVault(); }
   if(p.clientsKey && p.clientsKey !== VAULT.ck){
     VAULT.ck = p.clientsKey; saveVault();
     clSha = null;
@@ -561,9 +615,19 @@ async function findRemoteBackup(){
   try { const r = await fetch(FILE + '?t=' + Date.now(), { cache:'no-store' }); if(r.ok){ const t = await r.text(); JSON.parse(t); return t; } } catch(e){}
   return null;
 }
+function strength(p){
+  const words = p.trim().split(/[\s\-_.]+/).filter(w => w.length >= 3).length, kinds = [/[a-z]/, /[A-Z]/, /\d/, /[^\w\s]/].filter(r => r.test(p)).length;
+  if(p.length >= 24 || (words >= 4 && p.length >= 20)) return ['Robuste', 'var(--accent)'];
+  if(p.length >= 16 && (words >= 3 || kinds >= 3)) return ['Correct', 'var(--ink)'];
+  return ['Faible : allongez-le (une phrase de 4 ou 5 mots est idéale)', 'var(--err)'];
+}
+$('#lkPass').addEventListener('input', e => {
+  const el = $('#lkStrength'); if($('#lkConfirmWrap').hidden || !e.target.value){ el.hidden = true; return; }
+  const [t, c] = strength(e.target.value); el.hidden = false; el.textContent = 'Robustesse : ' + t; el.style.color = c;
+});
 function lockMode(){
   const hasVault = !!readJSON(KV), first = !hasVault && !REMOTE;
-  $('#lkConfirmWrap').hidden = !first;
+  $('#lkConfirmWrap').hidden = !first; if(!first) $('#lkStrength').hidden = true;
   if(!hasVault && REMOTE){
     $('#lockTitle').textContent = 'Page d\'administration verrouillée';
     $('#lockText').textContent = 'Nouveau navigateur : une sauvegarde chiffrée a été trouvée sur GitHub. Saisissez votre mot de passe administrateur pour retrouver techniciens, clients et accès GitHub.';
@@ -604,7 +668,7 @@ $('#lockForm').addEventListener('submit', async e => {
       catch(err){ msg.style.color = 'var(--err)'; msg.textContent = 'Mot de passe incorrect.'; $('#lkGo').disabled = false; $('#lkPass').select(); return; }
       vSalt = crypto.getRandomValues(new Uint8Array(16)); vKey = await deriveVaultKey(pass, vSalt); vIter = ITER;
       VAULT = Array.isArray(payload) ? { techs: payload, clients: [], repo: repoGuess() }
-        : { techs: payload.techniciens || [], clients: [], ck: payload.clientsKey, repo: payload.repo || repoGuess(), token: payload.token || '' };
+        : { techs: payload.techniciens || [], clients: [], ck: payload.clientsKey, repo: payload.repo || repoGuess(), token: payload.token || '', ht: payload.ht || '', oldKeys: payload.oldKeys || {} };
       if(!VAULT.ck) delete VAULT.ck;
       // liste des clients : fichier public chiffré, lisible avec la clé de la sauvegarde
       if(VAULT.ck){
@@ -631,8 +695,122 @@ let idleT;
 const IDLE_MIN = 15;
 function resetIdle(){ clearTimeout(idleT); if(ADMIN_PASS) idleT = setTimeout(() => writeVault().finally(lockNow), IDLE_MIN * 60000); }
 ['pointerdown','keydown','scroll'].forEach(ev => document.addEventListener(ev, resetIdle, { passive:true }));
+/* ---------- paramètres des bons (config.json) ---------- */
+const DEFAULT_TYPES = ['Réparation', 'Vérification', 'Mise en route', 'Installation', 'Formation', 'Contrat maintenance', 'Contrat mise à disposition', 'Contrat location', 'Garantie', 'Autre'];
+let CFG = {}, cfgSha = null, pfLogo = null;
+async function loadConfig(){
+  const c = bkCfg();
+  try {
+    if(c.repo && c.token){ const j = await gh('GET', null, 'config.json'); if(j){ cfgSha = j.sha; CFG = JSON.parse(td.decode(unb64(j.content))); } }
+    else { const r = await fetch('config.json?t=' + Date.now(), { cache:'no-store' }); if(r.ok) CFG = await r.json(); }
+  } catch(e){}
+  const E = CFG.entete || {};
+  $('#pfTypes').value = (Array.isArray(CFG.types) && CFG.types.length ? CFG.types : DEFAULT_TYPES).join('\n');
+  $('#pfNom').value = E.nom || ''; $('#pfAdresse').value = E.adresse || ''; $('#pfTel').value = E.tel || ''; $('#pfMail').value = E.email || '';
+  pfLogo = E.logo || null; showLogo();
+}
+function showLogo(){ const i = $('#pfLogo'); i.hidden = !pfLogo; if(pfLogo) i.src = pfLogo.data; }
+$('#pfLogoIn').addEventListener('change', e => {
+  const f = e.target.files[0]; e.target.value = ''; if(!f) return;
+  const url = URL.createObjectURL(f), img = new Image();
+  img.onload = () => {
+    const k = Math.min(1, 600 / img.naturalWidth, 200 / img.naturalHeight), w = Math.round(img.naturalWidth * k), h = Math.round(img.naturalHeight * k);
+    const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(img, 0, 0, w, h);
+    pfLogo = { data: c.toDataURL(f.type === 'image/jpeg' ? 'image/jpeg' : 'image/png', 0.9), w, h }; URL.revokeObjectURL(url); showLogo();
+    $('#pfMsg').textContent = 'Logo prêt : cliquez sur « Publier les paramètres ».';
+  };
+  img.onerror = () => { $('#pfMsg').textContent = "Cette image n'a pas pu être lue."; };
+  img.src = url;
+});
+$('#pfLogoDel').onclick = () => { pfLogo = null; showLogo(); $('#pfMsg').textContent = 'Logo retiré : cliquez sur « Publier les paramètres ».'; };
+$('#pfSave').onclick = async () => {
+  const types = [...new Set($('#pfTypes').value.split(/\n/).map(x => x.trim()).filter(Boolean))];
+  if(!types.length){ $('#pfMsg').textContent = "Indiquez au moins un type d'intervention."; return; }
+  const c = bkCfg();
+  if(!(c.repo && c.token)){ $('#pfMsg').textContent = 'Configurez d\'abord la sauvegarde GitHub (jeton) pour publier.'; return; }
+  const next = { ...CFG, types, entete: { nom: $('#pfNom').value.trim(), adresse: $('#pfAdresse').value.trim(), tel: $('#pfTel').value.trim(), email: $('#pfMail').value.trim(), ...(pfLogo ? { logo: pfLogo } : {}) } };
+  try {
+    $('#pfMsg').textContent = 'Publication…';
+    if(cfgSha === null){ const j = await gh('GET', null, 'config.json').catch(() => null); cfgSha = j ? j.sha : null; }
+    const text = JSON.stringify(next, null, 2);
+    const res = await gh('PUT', { message:'Paramètres des bons', content: btoa(unescape(encodeURIComponent(text))), ...(cfgSha ? { sha: cfgSha } : {}) }, 'config.json');
+    cfgSha = res.content.sha; CFG = next;
+    $('#pfMsg').textContent = 'Paramètres publiés le ' + new Date().toLocaleString('fr-FR') + ' (' + types.length + ' types).';
+    $('#pfTypes').value = types.join('\n');
+  } catch(e){ cfgSha = null; $('#pfMsg').textContent = 'Publication impossible : ' + e.message + '.'; }
+};
+/* ---------- historique (tickets GitHub chiffrés par technicien) ---------- */
+$('#htSave').onclick = () => {
+  const v = $('#htToken').value.trim();
+  if(!v || v.startsWith('•')){ $('#htMsg').textContent = 'Collez le jeton « Issues ».'; return; }
+  VAULT.ht = v; saveVault(); backupSoon(); $('#htToken').value = '••••••••••';
+  $('#htMsg').textContent = 'Jeton enregistré. Renvoyez leur lien aux techniciens (bouton « Lien ») pour activer leur historique.';
+};
+const b64b = t => Uint8Array.from(atob(t), c => c.charCodeAt(0));
+async function unsealH(k, o){ const key = await crypto.subtle.importKey('raw', unb64u(k), 'AES-GCM', false, ['decrypt']); return td.decode(await crypto.subtle.decrypt({ name:'AES-GCM', iv: b64b(o.iv) }, key, b64b(o.data))); }
+async function ghr(path){
+  const tok = VAULT.ht || VAULT.token, repo = VAULT.repo || repoGuess();
+  const r = await fetch('https://api.github.com/repos/' + repo + '/' + path, { cache:'no-store', headers:{ ...(tok ? { 'Authorization':'Bearer ' + tok } : {}), 'Accept':'application/vnd.github+json', 'X-GitHub-Api-Version':'2022-11-28' } });
+  if(!r.ok) throw new Error('GitHub ' + r.status); return r.json();
+}
+let HC = [], HOPEN = {};
+function keyring(){
+  const m = {}; Object.entries(VAULT.oldKeys || {}).forEach(([hid, v]) => m[hid] = v);
+  get().forEach(t => { if(t.hid && t.hk) m[t.hid] = { hk: t.hk, nom: t.prenom + ' ' + t.nom }; });
+  return m;
+}
+function fillHcTech(){
+  const ring = keyring(), sel = $('#hcTech'), cur = sel.value;
+  sel.innerHTML = '<option value="">Tous</option>' + Object.entries(ring).map(([hid, v]) => '<option value="' + esc(hid) + '">' + esc(v.nom) + '</option>').join('');
+  sel.value = cur;
+}
+$('#hcLoad').onclick = async () => {
+  const ring = keyring(); $('#hcMsg').textContent = 'Chargement…'; HC = [];
+  try {
+    for(let page = 1; page <= 20; page++){
+      const l = await ghr('issues?state=all&per_page=100&page=' + page);
+      for(const i of l){
+        const m = /^BI (\S+) /.exec(i.title || ''); if(!m || !ring[m[1]]) continue;
+        try { const j = JSON.parse(i.body.slice(i.body.indexOf('{'))); const o = JSON.parse(await unsealH(ring[m[1]].hk, j)); if((i.comments ?? o.parts) >= o.parts) HC.push({ ...o, issue: i.number, hid: m[1], techNom: ring[m[1]].nom }); } catch(e){}
+      }
+      if(l.length < 100) break;
+    }
+    HC.sort((a, b) => (b.validatedAt || 0) - (a.validatedAt || 0));
+    $('#hcMsg').textContent = HC.length + ' bon(s) archivé(s) lisible(s).';
+  } catch(e){ $('#hcMsg').textContent = 'Chargement impossible : ' + e.message + '.'; }
+  renderHc();
+};
+function renderHc(){
+  const t = $('#hcTech').value, q = $('#hcSearch').value.trim().toLowerCase();
+  const l = HC.filter(x => (!t || x.hid === t) && (!q || [x.numero, x.client, x.type, x.codeClient, x.techNom].join(' ').toLowerCase().includes(q)));
+  $('#hcCount').textContent = l.length;
+  $('#hcList').innerHTML = l.slice(0, 200).map(x => `<div class="item"><div style="min-width:0"><b>${esc(x.numero)}</b><span>${esc(x.client)}${x.codeClient ? ' · ' + esc(x.codeClient) : ''} · ${esc(x.type || '')}</span><span>${esc(x.techNom)} · ${esc(x.entreprise || '')} · ${x.photos || 0} photo(s)</span></div><span style="display:flex;gap:6px" data-box="${x.issue}"><button type="button" class="btn small" data-hget="${x.issue}">Récupérer</button></span><span></span></div>`).join('')
+    || (HC.length ? '<p class="empty">Aucun bon ne correspond.</p>' : '');
+}
+$('#hcTech').addEventListener('change', renderHc); $('#hcSearch').addEventListener('input', renderHc);
+function dl(blob, name){ const u = URL.createObjectURL(blob), a = document.createElement('a'); a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 10000); }
+$('#hcList').addEventListener('click', async e => {
+  const g = e.target.closest('[data-hfile]');
+  if(g){ const pl = HOPEN[+g.dataset.n]; if(g.dataset.hfile === 'pdf') dl(new Blob([b64b(pl.pdf)], { type:'application/pdf' }), pl.file); else dl(new Blob([JSON.stringify(pl.data, null, 2)], { type:'application/json' }), pl.file.replace(/\.pdf$/, '.json')); return; }
+  const b = e.target.closest('[data-hget]'); if(!b) return;
+  const n = +b.dataset.hget, x = HC.find(h => h.issue === n), ring = keyring(), box = b.parentElement;
+  try {
+    b.disabled = true; b.textContent = 'Téléchargement…';
+    const comments = [];
+    for(let page = 1; page <= 20; page++){ const l = await ghr('issues/' + n + '/comments?per_page=100&page=' + page); comments.push(...l); if(l.length < 100) break; }
+    const parts = comments.map(c => { const m = /^part (\d+)\/(\d+)\n/.exec(c.body); return m ? { i: +m[1], t: c.body.slice(m[0].length) } : null; }).filter(Boolean).sort((a, b2) => a.i - b2.i);
+    if(parts.length !== x.parts) throw new Error('archive incomplète (' + parts.length + '/' + x.parts + ')');
+    const body = parts.map(q => q.t).join(''), k = body.indexOf(':');
+    HOPEN[n] = JSON.parse(await unsealH(ring[x.hid].hk, { iv: body.slice(0, k), data: body.slice(k + 1) }));
+    box.innerHTML = '<button type="button" class="btn small primary" data-hfile="pdf" data-n="' + n + '">PDF</button><button type="button" class="btn small" data-hfile="json" data-n="' + n + '">JSON</button>';
+  } catch(err){ b.disabled = false; b.textContent = 'Réessayer'; toast(err.name === 'OperationError' ? 'Archive altérée ou illisible.' : err.message); }
+});
+
 function startApp(){
-  renderList(); renderCl(); bkRender(); resetIdle();
+  let added = false; get().forEach(t => { if(!t.hid || !t.hk){ withKeys(t); added = true; } });
+  if(added) saveVault();
+  if(VAULT.ht) $('#htToken').value = '••••••••••';
+  renderList(); renderCl(); bkRender(); resetIdle(); loadConfig(); fillHcTech();
   if(bkCfg().repo && bkCfg().token){ bkStatus('Connexion à la sauvegarde GitHub…'); $('#bkUnlock').click(); }
   else if(getCl().length) publishClients();
 }

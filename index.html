@@ -10,10 +10,15 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-x/0MLnv2SkBnKVCmkZVERUCNAVtUxbG8arXshGcSla8='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://api.github.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <style>
+/* polices hébergées dans le dépôt (aucun appel à Google Fonts) — IBM Plex, licence SIL OFL */
+@font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/ibm-plex-sans-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:500;font-display:swap;src:url(fonts/ibm-plex-sans-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:600;font-display:swap;src:url(fonts/ibm-plex-sans-latin-600-normal.woff2) format("woff2")}
+@font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:700;font-display:swap;src:url(fonts/ibm-plex-sans-latin-700-normal.woff2) format("woff2")}
+@font-face{font-family:"IBM Plex Mono";font-style:normal;font-weight:500;font-display:swap;src:url(fonts/ibm-plex-mono-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:"IBM Plex Mono";font-style:normal;font-weight:600;font-display:swap;src:url(fonts/ibm-plex-mono-latin-600-normal.woff2) format("woff2")}
 /* Fiche de chantier : une colonne étroite, champs larges pour le pouce, barre d'action collée en bas */
 :root{
   --bg:#eef2f3; --surface:#ffffff; --field:#f6f8f9; --ink:#14212b; --muted:#5b6a74; --line:#d3dbdf;
@@ -49,7 +54,8 @@ main{max-width:760px;margin:0 auto;padding:16px 16px 0}
 .card h2{margin:0;font-size:11.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;align-items:center;gap:8px}
 .row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
 label.f{display:block;font-size:13px;font-weight:500;min-width:0}
-label.f>input,label.f>textarea{display:block;margin-top:5px}
+label.f>input,label.f>textarea,label.f>select{display:block;margin-top:5px}
+select{width:100%;min-height:44px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--field);font-size:16px;color:var(--ink)}
 label.f .req{color:var(--err)}
 input[type=text],input[type=email],input[type=date],input[type=time],input[type=number],textarea{
   width:100%;min-height:44px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--field);font-size:16px}
@@ -116,6 +122,7 @@ dl.sum dd{margin:0;overflow-wrap:anywhere}
   <div class="brand">
     <span class="mark" aria-hidden="true">BI</span>
     <div><strong>Bons d'intervention</strong><small id="who">Technicien non renseigné</small></div>
+    <button type="button" class="btn small" id="navHist" style="margin-left:auto" hidden>Historique</button>
   </div>
 </header>
 
@@ -143,7 +150,7 @@ dl.sum dd{margin:0;overflow-wrap:anywhere}
     <h2>Client</h2>
     <div class="row">
       <label class="f">Client <span class="req" aria-hidden="true">*</span><input type="text" id="f-client" list="clientsList" autocomplete="off" placeholder="Tapez le nom ou le code client"></label>
-      <label class="f">Site / bâtiment<input type="text" id="f-site" autocomplete="off"></label>
+      <label class="f">Type d'intervention <span class="req" aria-hidden="true">*</span><select id="f-typeInter"></select></label>
     </div>
     <p class="hint" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span id="clientHint"></span><button type="button" class="btn small" id="clRefresh">Actualiser la liste</button></p>
     <div class="row">
@@ -240,11 +247,20 @@ dl.sum dd{margin:0;overflow-wrap:anywhere}
       <a class="btn link" id="aMailto" href="#">E-mail sans pièce jointe (dernier recours)</a>
     </div>
     <p class="hint" id="r-help"></p>
+    <p class="hint" id="r-arch"></p>
   </div>
   <div class="bar">
     <button type="button" class="btn ghost" id="aNew">Nouveau bon</button>
     <button type="button" class="btn" id="aSent">Marquer comme envoyé</button>
   </div>
+</section>
+
+<!-- ============ HISTORIQUE ============ -->
+<section id="view-history" class="view" hidden>
+  <div class="bon-head"><div><span class="lbl">Mes bons archivés</span><strong id="h-count"></strong></div><button type="button" class="btn small" id="hBack">Retour au bon</button></div>
+  <p class="hint" id="h-msg"></p>
+  <input type="search" id="h-search" placeholder="Rechercher (client, n°, type)…" aria-label="Rechercher" style="width:100%;min-height:44px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--field);font-size:16px">
+  <div class="hist" id="hist"></div>
 </section>
 
 <!-- ============ VERROU ============ -->
@@ -267,8 +283,8 @@ dl.sum dd{margin:0;overflow-wrap:anywhere}
 <datalist id="clientsList"></datalist>
 <div id="toast" role="status" aria-live="polite"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="lib/jspdf.umd.min.js"></script>
+<script src="lib/jspdf.plugin.autotable.min.js"></script>
 <script>
 "use strict";
 /* ---------- utilitaires ---------- */
@@ -311,37 +327,50 @@ function settings(){
   return { ...s, entreprise: s.entreprise || CONF.entreprise || '', dest: s.dest || CONF.destinataire || '', cc: s.cc || CONF.cc || '' };
 }
 const hist = () => store.get(K_HIST, []);
-function saveHist(list){ return store.set(K_HIST, list.slice(0, 3)); }
+function saveHist(list){ const pend = list.filter(isPending), done = list.filter(b => !isPending(b)).slice(0, 3); return store.set(K_HIST, [...pend, ...done].sort((a, b) => (b.validatedAt || 0) - (a.validatedAt || 0))); }
+const archOn = () => { const s = store.get(K_SET, {}); return !!(s.ht && s.hk && s.hid); };
+const isPending = b => archOn() && !b.archivedAt;
 const usedNums = () => store.get('bi.used', []);
 
 function newNumero(date, ini){
   const used = new Set([...usedNums(), ...hist().map(b => b.numero)]);
-  let n; do { n = date.replaceAll('-','') + '-' + (ini || 'XX') + '-' + String(Math.floor(Math.random()*1000)).padStart(3,'0'); } while(used.has(n));
+  let n; do { n = date.replaceAll('-','') + '-' + (ini || 'XX') + '-' + String(Math.floor(Math.random()*1000)).padStart(3,'0'); } while([...used].some(u => u === n || u.startsWith(n + '-')));
   return n;
+}
+const DEFAULT_TYPES = ['Réparation', 'Vérification', 'Mise en route', 'Installation', 'Formation', 'Contrat maintenance', 'Contrat mise à disposition', 'Contrat location', 'Garantie', 'Autre'];
+const typesList = () => (Array.isArray(CONF.types) && CONF.types.length ? CONF.types : DEFAULT_TYPES);
+const typeSlug = t => String(t || '').trim().replace(/[\/\\:*?"<>|]/g, '').replace(/\s+/g, '-');
+const fullNum = d => d.numero + (d.typeInter ? '-' + typeSlug(d.typeInter) : '');
+function fillTypes(){
+  const sel = $('#f-typeInter'), cur = draft ? draft.typeInter : '';
+  const list = typesList().slice(); if(cur && !list.includes(cur)) list.push(cur);
+  sel.innerHTML = '<option value="">— Choisir —</option>' + list.map(t => '<option value="' + esc(t) + '">' + esc(t) + '</option>').join('');
+  sel.value = cur || '';
 }
 function rebuildNumero(num, date, ini){ const rnd = (num||'').split('-').pop() || '000'; return date.replaceAll('-','') + '-' + (ini||'XX') + '-' + rnd; }
 function defaultCc(s){ const l = emails(s.cc); if(s.ccSelf && s.email && !l.includes(s.email)) l.push(s.email); return l.join(', '); }
 function techOf(s){ return { prenom: s.prenom||'', nom: s.nom||'', initiales: s.initiales||'', email: s.email||'' }; }
 
 /* ---------- brouillon ---------- */
-const FIELDS = ['entreprise','date','client','codeClient','departement','nbTech','site','adresse','contact','clientEmail','debut','fin','pause','objet','travaux','obs','dest','cc','signNom'];
+const FIELDS = ['entreprise','date','client','codeClient','departement','nbTech','typeInter','adresse','contact','clientEmail','debut','fin','pause','objet','travaux','obs','dest','cc','signNom'];
 let draft;
 function blankDraft(){
   const s = settings(), date = today();
   return { numero: newNumero(date, s.initiales), statut:'brouillon', entreprise: s.entreprise||'', date,
-    client:'', codeClient:'', departement:'', nbTech:'1', site:'', adresse:'', contact:'', clientEmail:'', debut:'', fin:'', pause:'0', objet:'', travaux:'', obs:'',
+    client:'', codeClient:'', departement:'', nbTech:'1', typeInter:'', adresse:'', contact:'', clientEmail:'', debut:'', fin:'', pause:'0', objet:'', travaux:'', obs:'',
     dest: s.dest||'', cc: defaultCc(s), sendClient:false, materiel:[], photos:[], signature:null, signNom:'',
     tech: techOf(s), createdAt: Date.now() };
 }
 let saveT;
-function saveDraft(now){ clearTimeout(saveT); const go = () => store.set(K_DRAFT, draft); now ? go() : (saveT = setTimeout(go, 400)); }
+function saveDraft(now){ clearTimeout(saveT); const go = () => { draft.updatedAt = Date.now(); store.set(K_DRAFT, draft); }; now ? go() : (saveT = setTimeout(go, 400)); }
 
 function fillForm(){
   const cfg = settings();
   if(cfg.entreprise && draft.entreprise !== cfg.entreprise){ draft.entreprise = cfg.entreprise; saveDraft(); }
+  fillTypes();
   FIELDS.forEach(k => { $('#f-'+k).value = draft[k] ?? ''; });
   $('#f-sendClient').checked = !!draft.sendClient;
-  $('#numero').textContent = draft.numero;
+  $('#numero').textContent = fullNum(draft);
   const t = draft.tech;
   $('#i-tech').textContent = t.prenom ? t.prenom + ' ' + t.nom + ' (' + t.initiales + ')' : '—';
   const em = $('#i-email'); em.textContent = t.email || 'Non renseigné'; em.style.color = t.email ? '' : 'var(--err)';
@@ -361,7 +390,8 @@ $('#view-form').addEventListener('input', e => {
     if(k === 'sendClient'){ draft.sendClient = el.checked; }
     else if(FIELDS.includes(k)){
       draft[k] = el.value;
-      if(k === 'date' && el.value){ draft.numero = rebuildNumero(draft.numero, el.value, draft.tech.initiales); $('#numero').textContent = draft.numero; }
+      if(k === 'date' && el.value){ draft.numero = rebuildNumero(draft.numero, el.value, draft.tech.initiales); }
+      if(k === 'date' || k === 'typeInter') $('#numero').textContent = fullNum(draft);
       if(k === 'debut' || k === 'fin' || k === 'pause' || k === 'nbTech') updDuree();
     }
     saveDraft();
@@ -466,7 +496,7 @@ function recipients(b){
 function check(){
   const err = [];
   if(!draft.tech.prenom || !draft.tech.nom) err.push('la configuration (ouvrez le lien envoyé par votre responsable)');
-  const need = [['entreprise',"l'entreprise de l'intervenant"],['date',"la date d'intervention"],['client','le nom du client'],['codeClient','le code client'],['departement','le département'],
+  const need = [['entreprise',"l'entreprise de l'intervenant"],['date',"la date d'intervention"],['client','le nom du client'],['codeClient','le code client'],['typeInter',"le type d'intervention"],['departement','le département'],
     ['debut',"l'heure d'arrivée"],['fin','l’heure de départ'],['travaux','les travaux réalisés'],['signNom','le nom du signataire']];
   need.forEach(([k, l]) => { if(!String(draft[k]||'').trim()) err.push(l); });
   const {to, cc} = recipients(draft);
@@ -486,7 +516,7 @@ $('#btnValidate').onclick = () => {
     box.hidden = false; box.scrollIntoView({behavior:'smooth', block:'center'}); return;
   }
   box.hidden = true;
-  const b = { ...draft, statut:'valide', validatedAt: Date.now(), duree: dureeMin(draft.debut, draft.fin, draft.pause) };
+  const b = { ...draft, numero: fullNum(draft), statut:'valide', validatedAt: Date.now(), duree: dureeMin(draft.debut, draft.fin, draft.pause) };
   const list = hist().filter(x => x.numero !== b.numero); list.unshift(b);
   if(!saveHist(list)) return;
   store.set('bi.used', [b.numero, ...usedNums()].slice(0, 500)); store.set('bi.showRecap', true);
@@ -502,67 +532,137 @@ $('#btnReset').onclick = e => {
 
 /* ---------- PDF ---------- */
 function buildPdf(b){
+  // Mise en page inspirée de la fiche d'intervention papier : étiquettes bleues, cadres, cases à cocher.
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit:'mm', format:'a4' });
-  const W = 210, M = 14, ACC = [11,110,110], INKC = [20,33,43], MUT = [91,106,116], LN = [205,213,217];
-  const t = b.tech;
-  doc.setFillColor(...ACC); doc.rect(0, 0, W, 26, 'F');
-  doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(15); doc.text("BON D'INTERVENTION", M, 11);
-  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.text(b.entreprise, M, 18.5);
-  doc.setFont('courier','bold'); doc.setFontSize(12); doc.text('N° ' + b.numero, W-M, 11, {align:'right'});
-  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.text('Intervention du ' + fmtDate(b.date), W-M, 18.5, {align:'right'});
-  const base = { theme:'grid', margin:{left:M, right:M},
-    styles:{ font:'helvetica', fontSize:9.5, textColor:INKC, lineColor:LN, lineWidth:0.2, cellPadding:2.2, overflow:'linebreak' },
-    headStyles:{ fillColor:[230,240,240], textColor:INKC, fontStyle:'bold' } };
-  const next = gap => doc.lastAutoTable.finalY + (gap || 5);
-  doc.autoTable({ ...base, startY: 32,
-    head: [[{content:'Intervenant', colSpan:2}, {content:'Client', colSpan:2}]],
-    body: [
-      ['Entreprise', b.entreprise, 'Client', b.client],
-      ['Technicien', t.prenom + ' ' + t.nom, 'Code client', (b.codeClient || '-') + (b.departement ? '  (dépt ' + b.departement + ')' : '')],
-      ['Intervenants', String(nbOf(b)), 'Site', b.site || '-'],
-      ['E-mail', t.email || '-', 'Adresse', b.adresse || '-'],
-      ['', '', 'Contact', b.contact || '-'] ],
-    columnStyles:{ 0:{fontStyle:'bold', textColor:MUT, cellWidth:24}, 1:{cellWidth:60}, 2:{fontStyle:'bold', textColor:MUT, cellWidth:23} } });
-  doc.autoTable({ ...base, startY: next(),
-    head: [['Date','Arrivée','Départ','Pause','Temps sur place','Intervenants','Main d\u2019oeuvre']],
-    body: [[fmtDate(b.date), b.debut, b.fin, (Number(b.pause)||0) + ' min', fmtDuree(b.duree), String(nbOf(b)), fmtDuree(b.duree * nbOf(b))]],
-    styles:{ ...base.styles, halign:'center' }, columnStyles:{ 6:{fontStyle:'bold'} } });
-  doc.autoTable({ ...base, startY: next(),
-    head: [['Travaux réalisés' + (b.objet ? '  -  ' + b.objet : '')]], body: [[b.travaux]] });
-  doc.autoTable({ ...base, startY: next(),
-    head: [['Référence','Désignation du matériel remplacé','Qté']],
-    body: b.materiel.length ? b.materiel.map(m => [m.ref || '-', m.des || '-', m.qte || '']) :
-      [[{content:'Aucun matériel remplacé', colSpan:3, styles:{textColor:MUT, fontStyle:'italic'}}]],
-    columnStyles:{ 0:{cellWidth:46, font:'courier', fontStyle:'bold'}, 2:{cellWidth:16, halign:'right'} } });
-  if(b.obs && b.obs.trim()) doc.autoTable({ ...base, startY: next(), head: [['Observations / réserves']], body: [[b.obs]] });
+  const doc = new jsPDF({ unit:'mm', format:'a4', compress:true });
+  const W = 210, M = 10, CW = W - 2 * M, BOT = 284;
+  const BLUE = [30,136,196], INK = [25,35,45], MUT = [105,115,125], RULE = [196,219,234];
+  const E = CONF.entete || {}, t = b.tech, nb = nbOf(b);
+  const hoursTxt = m => String(Math.round(m / 60 * 100) / 100).replace('.', ',');
+  let y = 10;
+  const ensure = h => { if(y + h > BOT){ doc.addPage(); y = 14; } };
+  const chip = (x, yy, label) => {
+    doc.setFont('helvetica','bold'); doc.setFontSize(7.5);
+    const w = doc.getTextWidth(label) + 4;
+    doc.setFillColor(...BLUE); doc.rect(x, yy, w, 5.5, 'F');
+    doc.setTextColor(255,255,255); doc.text(label, x + 2, yy + 3.9);
+    return w;
+  };
+  const frame = (x, yy, w, h) => { doc.setDrawColor(...BLUE); doc.setLineWidth(0.35); doc.roundedRect(x, yy, w, h, 1.2, 1.2); };
+  const txt = (s, x, yy, size, bold, color, opt) => { doc.setFont('helvetica', bold ? 'bold' : 'normal'); doc.setFontSize(size); doc.setTextColor(...(color || INK)); doc.text(String(s ?? ''), x, yy, opt || {}); };
 
-  let y = next(8); const bh = 50;
-  if(y + bh > 282){ doc.addPage(); y = 18; }
-  const bw = (W - 2*M - 6) / 2, x2 = M + bw + 6;
-  doc.setDrawColor(...LN); doc.setLineWidth(0.3); doc.rect(M, y, bw, bh); doc.rect(x2, y, bw, bh);
-  doc.setFontSize(8.5); doc.setTextColor(...MUT); doc.setFont('helvetica','bold');
-  doc.text("VALIDATION DE L'INTERVENANT", M+3, y+5.5); doc.text('SIGNATURE DU CLIENT', x2+3, y+5.5);
-  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(...INKC);
-  doc.text(t.prenom + ' ' + t.nom, M+3, y+13); doc.text(b.entreprise, M+3, y+19);
-  doc.setFontSize(9); doc.setTextColor(...MUT);
-  doc.text('Bon validé le ' + fmtStamp(b.validatedAt), M+3, y+bh-4);
-  doc.setFontSize(10); doc.setTextColor(...INKC); doc.text(b.signNom, x2+3, y+13);
-  if(b.signature){
-    const maxW = bw - 6, maxH = bh - 25, k = Math.min(maxW / b.signature.w, maxH / b.signature.h);
-    doc.addImage(b.signature.data, 'PNG', x2+3, y+16, b.signature.w*k, b.signature.h*k);
-    doc.setFontSize(9); doc.setTextColor(...MUT); doc.text('Signé le ' + fmtStamp(b.signature.at), x2+3, y+bh-4);
+  /* en-tête */
+  let hx = M;
+  const LG = (E.logo && E.logo.data) ? E.logo : DEFAULT_LOGO;   // logo du donneur d'ordre ; jamais le nom du prestataire
+  if(LG && LG.data){
+    const lw = Math.min(55, LG.w / LG.h * 13), lh = lw / LG.w * LG.h;
+    try { doc.addImage(LG.data, /png/i.test(LG.data.slice(0, 30)) ? 'PNG' : 'JPEG', M, y + (13 - lh) / 2, lw, lh); hx = M + lw + 5; } catch(e){}
+  } else if(E.nom){
+    txt(E.nom, M, y + 9, 18, true, BLUE); doc.setFontSize(18); hx = M + doc.getTextWidth(E.nom) + 4;
   }
-  // photos : 2 par page
-  b.photos.forEach((p, i) => {
-    if(i % 2 === 0){ doc.addPage(); doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...INKC); doc.text('Photos de l’intervention', M, 16); }
-    const slotY = i % 2 === 0 ? 22 : 152, maxW = W - 2*M, maxH = 122, k = Math.min(maxW / p.w, maxH / p.h);
-    doc.addImage(p.data, 'JPEG', M + (maxW - p.w*k)/2, slotY, p.w*k, p.h*k);
+  const addr = [...String(E.adresse || '').split(/\n/), [E.tel ? 'Tél. : ' + E.tel : '', E.email].filter(Boolean).join(' · ')].filter(x => x.trim());
+  addr.slice(0, 4).forEach((l, k) => txt(l, hx, y + 3 + k * 3.4, 7, false, MUT));
+  txt("FICHE D'INTERVENTION", W - M, y + 7, 15, true, BLUE, { align:'right' });
+  doc.setFont('courier','bold'); doc.setFontSize(9.5); doc.setTextColor(...INK); doc.text('N° ' + b.numero, W - M, y + 13, { align:'right' });
+  y += 20;
+
+  /* client */
+  const split = 122, h1 = 15, h2 = 15;
+  frame(M, y, CW, h1 + h2);
+  doc.setDrawColor(...BLUE); doc.line(M, y + h1, M + CW, y + h1); doc.line(M + split, y, M + split, y + h1 + h2);
+  let w = chip(M + 2, y + 2, 'NOM - CLIENT - FACTURE');
+  doc.setFontSize(11.5); doc.setFont('helvetica','bold');
+  txt(doc.splitTextToSize(b.client, split - w - 8)[0], M + w + 5, y + 6.2, 11.5, true);
+  w = chip(M + split + 2, y + 2, 'SITE / ADRESSE');
+  doc.setFont('helvetica','normal'); doc.setFontSize(8);
+  doc.splitTextToSize(String(b.adresse || '-').replace(/\n/g, ' · '), CW - split - 5).slice(0, 2).forEach((l, k) => txt(l, M + split + 2.5, y + 11 + k * 3.4, 8));
+  w = chip(M + 2, y + h1 + 2, 'CODE CLIENT "sold-to"');
+  txt((b.codeClient || '-') + (b.departement ? '      Dépt ' + b.departement : ''), M + w + 5, y + h1 + 6.2, 11.5, true);
+  chip(M + split + 2, y + h1 + 2, 'CONTACT');
+  [b.contact, b.clientEmail].filter(Boolean).slice(0, 2).forEach((l, k) => txt(l, M + split + 2.5, y + h1 + 11 + k * 3.4, 8));
+  y += h1 + h2 + 4;
+
+  /* horaires */
+  doc.autoTable({ startY: y, margin:{ left:M, right:M }, theme:'grid',
+    head: [['Date intervention', 'Intervenant', 'Heure arrivée', 'Pause', 'Heure départ', 'Intervenants', "Main d'œuvre"]],
+    body: [[fmtDate(b.date), t.prenom + ' ' + t.nom, b.debut, (Number(b.pause) || 0) ? b.pause + ' min' : '-', b.fin, String(nb), fmtDuree(b.duree * nb)]],
+    styles:{ font:'helvetica', fontSize:8.5, halign:'center', valign:'middle', textColor:INK, lineColor:BLUE, lineWidth:0.3, cellPadding:1.8 },
+    headStyles:{ fillColor:BLUE, textColor:255, fontStyle:'bold', fontSize:7.2 }, columnStyles:{ 6:{ fontStyle:'bold' } } });
+  y = doc.lastAutoTable.finalY + 4;
+
+  /* objet de l'intervention : cases à cocher */
+  const types = typesList().slice(); if(b.typeInter && !types.includes(b.typeInter)) types.push(b.typeInter);
+  const perRow = 4, rowsN = Math.ceil(types.length / perRow), hObj = 9 + rowsN * 6;
+  ensure(hObj); frame(M, y, CW, hObj); chip(M + 2, y + 2, "OBJET DE L'INTERVENTION");
+  types.forEach((ty, k) => {
+    const cx = M + 4 + (k % perRow) * (CW / perRow), cy = y + 10 + Math.floor(k / perRow) * 6, on = ty === b.typeInter;
+    doc.setDrawColor(...BLUE); doc.setLineWidth(0.35); doc.rect(cx, cy - 2.9, 3.4, 3.4);
+    if(on){ doc.setDrawColor(...INK); doc.setLineWidth(0.5); doc.line(cx + 0.5, cy - 2.4, cx + 2.9, cy); doc.line(cx + 2.9, cy - 2.4, cx + 0.5, cy); }
+    txt(ty, cx + 5, cy, 8.3, on, on ? INK : MUT);
+  });
+  y += hObj + 4;
+
+  /* description, sur lignes réglées */
+  const descr = [b.objet ? 'Objet : ' + b.objet : '', b.travaux].filter(Boolean).join('\n');
+  doc.setFont('helvetica','normal'); doc.setFontSize(9.5);
+  const lines = doc.splitTextToSize(descr || '-', CW - 6), LH = 5.6;
+  let li = 0;
+  while(li < lines.length){
+    const avail = Math.max(3, Math.floor((BOT - y - 12) / LH)); 
+    if(avail < 3){ doc.addPage(); y = 14; continue; }
+    const chunk = lines.slice(li, li + avail), hD = Math.max(li === 0 ? 34 : 0, 9 + chunk.length * LH + 3);
+    frame(M, y, CW, hD); chip(M + 2, y + 2, li === 0 ? "DESCRIPTION DE L'INTERVENTION" : 'DESCRIPTION (SUITE)');
+    doc.setDrawColor(...RULE); doc.setLineWidth(0.2);
+    for(let ly = y + 9 + LH; ly < y + hD - 1; ly += LH) doc.line(M + 3, ly + 1.2, M + CW - 3, ly + 1.2);
+    chunk.forEach((l, k) => txt(l, M + 3, y + 9 + (k + 1) * LH, 9.5));
+    li += chunk.length; y += hD + 4;
+    if(li < lines.length){ doc.addPage(); y = 14; }
+  }
+
+  /* articles : matériel + main d'œuvre + déplacement */
+  const rows = b.materiel.map(m => [m.ref || '-', m.des || '-', String(m.qte || '')]);
+  if(b.duree) rows.push(['SER00154', "Main d'œuvre (" + nb + ' intervenant' + (nb > 1 ? 's' : '') + ')', hoursTxt(b.duree * nb)]);
+  rows.push(['SER00156', 'Déplacement', String(nb)]);
+  ensure(20);
+  doc.autoTable({ startY: y, margin:{ left:M, right:M }, theme:'grid',
+    head: [['Code Article', 'Désignation', 'Qté']], body: rows,
+    styles:{ font:'helvetica', fontSize:9, textColor:INK, lineColor:BLUE, lineWidth:0.3, cellPadding:1.8 },
+    headStyles:{ fillColor:BLUE, textColor:255, fontStyle:'bold', fontSize:8 },
+    columnStyles:{ 0:{ cellWidth:36, font:'courier', fontStyle:'bold' }, 2:{ cellWidth:18, halign:'center', fontStyle:'bold' } } });
+  y = doc.lastAutoTable.finalY + 4;
+
+  /* observations */
+  doc.setFont('helvetica','normal'); doc.setFontSize(9);
+  const obs = doc.splitTextToSize(b.obs && b.obs.trim() ? b.obs : '', CW - 6), hO = Math.max(16, 9 + obs.length * 4.4 + 2);
+  ensure(hO); frame(M, y, CW, hO); chip(M + 2, y + 2, 'OBSERVATIONS - REMARQUES');
+  obs.forEach((l, k) => txt(l, M + 3, y + 12 + k * 4.4, 9));
+  y += hO + 4;
+
+  /* signatures */
+  const hS = 40, bw = (CW - 6) / 2, x2 = M + bw + 6;
+  ensure(hS);
+  frame(M, y, bw, hS); frame(x2, y, bw, hS);
+  doc.setFont('helvetica','bolditalic'); doc.setFontSize(8.5); doc.setTextColor(...BLUE);
+  doc.text('Signature du Technicien :', M + 3, y + 5.5); doc.text('Cachet, Nom et Signature du Client :', x2 + 3, y + 5.5);
+  txt(t.prenom + ' ' + t.nom, M + 3, y + 13, 10.5, true);
+  txt('Bon validé électroniquement', M + 3, y + hS - 8.5, 7.5, false, MUT); txt('le ' + fmtStamp(b.validatedAt), M + 3, y + hS - 4.5, 7.5, false, MUT);
+  txt(b.signNom, x2 + 3, y + 12, 10.5, true);
+  if(b.signature){
+    const maxW = bw - 6, maxH = hS - 22, k = Math.min(maxW / b.signature.w, maxH / b.signature.h);
+    doc.addImage(b.signature.data, 'PNG', x2 + 3, y + 14, b.signature.w * k, b.signature.h * k);
+    txt('Signé le ' + fmtStamp(b.signature.at), x2 + 3, y + hS - 3.5, 7.5, false, MUT);
+  }
+
+  /* photos : 2 par page */
+  b.photos.forEach((ph, i) => {
+    if(i % 2 === 0){ doc.addPage(); chip(M, 10, "PHOTOS DE L'INTERVENTION"); }
+    const slotY = i % 2 === 0 ? 20 : 152, maxW = CW, maxH = 124, k = Math.min(maxW / ph.w, maxH / ph.h);
+    doc.addImage(ph.data, 'JPEG', M + (maxW - ph.w * k) / 2, slotY, ph.w * k, ph.h * k);
   });
   const n = doc.getNumberOfPages();
   for(let i = 1; i <= n; i++){
-    doc.setPage(i); doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...MUT);
-    doc.text('Bon N° ' + b.numero + '  -  ' + b.client + (b.codeClient ? ' (' + b.codeClient + ')' : ''), M, 292); doc.text('Page ' + i + ' / ' + n, W-M, 292, {align:'right'});
+    doc.setPage(i); txt('Fiche N° ' + b.numero + '  -  ' + b.client + (b.codeClient ? ' (' + b.codeClient + ')' : ''), M, 292, 7.5, false, MUT);
+    txt('Page ' + i + ' / ' + n, W - M, 292, 7.5, false, MUT, { align:'right' });
   }
   return doc.output('blob');
 }
@@ -578,9 +678,9 @@ function dataOf(b){
   return {
     type: 'bon-intervention', version: 1,
     numero: b.numero, date: b.date, valideLe: new Date(b.validatedAt).toISOString(),
-    entreprise: b.entreprise, technicien: (t.prenom + ' ' + t.nom).trim(), initialesTechnicien: t.initiales, emailTechnicien: t.email,
+    entreprise: b.entreprise, technicien: (t.prenom + ' ' + t.nom).trim(), initialesTechnicien: t.initiales,
     departement: String(b.departement || '').trim().toUpperCase(), codeClient: String(b.codeClient || '').trim(),
-    client: b.client, site: b.site, adresse: b.adresse, contact: b.contact, emailClient: b.clientEmail,
+    client: b.client, typeIntervention: b.typeInter || '', site: b.site || '', adresse: b.adresse, contact: b.contact, emailClient: b.clientEmail,
     objet: b.objet, travaux: b.travaux, observations: b.obs,
     arrivee: b.debut, depart: b.fin, pauseMin: Number(b.pause) || 0,
     heuresSurPlace: h(d), nbIntervenants: n, heuresMainOeuvre: h(d * n),
@@ -594,7 +694,8 @@ function subjectOf(b){ return "Bon d'intervention " + b.numero + ' - ' + b.clien
 function bodyOf(b){
   const t = b.tech, mat = b.materiel.length;
   return 'Bonjour,\n\nVeuillez trouver ci-joint le bon d’intervention N° ' + b.numero + ' du ' + fmtDate(b.date) + '.\n\n' +
-    'Client : ' + b.client + (b.codeClient ? ' - code ' + b.codeClient : '') + (b.site ? ' (' + b.site + ')' : '') + '\n' +
+    'Client : ' + b.client + (b.codeClient ? ' - code ' + b.codeClient : '') + '\n' +
+    (b.typeInter ? "Type d'intervention : " + b.typeInter + '\n' : '') +
     'Horaires : ' + b.debut + ' - ' + b.fin + (Number(b.pause) ? ', pause ' + b.pause + ' min' : '') + '\n' +
     'Temps passé : ' + fmtDuree(b.duree) + (nbOf(b) > 1 ? ' x ' + nbOf(b) + ' intervenants = ' + fmtDuree(b.duree * nbOf(b)) : '') + '\n' +
     'Matériel remplacé : ' + (mat ? mat + ' ligne' + (mat > 1 ? 's' : '') : 'aucun') + '\n' +
@@ -632,7 +733,7 @@ function showRecap(num){
   curPdf = null; show('recap');
   const b = cur, {to, cc} = recipients(b), [pc, pl] = pillOf(b);
   $('#r-num').textContent = b.numero; const p = $('#r-pill'); p.className = 'pill ' + pc; p.textContent = pl;
-  const rows = [['Client', b.client + (b.site ? ' · ' + b.site : '')], ['Code client', (b.codeClient || '—') + (b.departement ? ' · dépt ' + b.departement : '')], ['Date', fmtDate(b.date)], ['Horaires', b.debut + ' – ' + b.fin + (Number(b.pause) ? ' (pause ' + b.pause + ' min)' : '')],
+  const rows = [['Client', b.client], ['Type', b.typeInter || '—'], ['Code client', (b.codeClient || '—') + (b.departement ? ' · dépt ' + b.departement : '')], ['Date', fmtDate(b.date)], ['Horaires', b.debut + ' – ' + b.fin + (Number(b.pause) ? ' (pause ' + b.pause + ' min)' : '')],
     ['Temps passé', fmtDuree(b.duree) + (nbOf(b) > 1 ? ' × ' + nbOf(b) + ' intervenants = ' + fmtDuree(b.duree * nbOf(b)) : '')], ['Matériel', b.materiel.length ? b.materiel.map(m => (m.qte||'') + ' × ' + (m.ref||'') + ' ' + (m.des||'')).join('\n') : 'Aucun'],
     ['Photos', String(b.photos.length)], ['Entreprise', b.entreprise], ['Signé par', b.signNom]];
   $('#r-sum').innerHTML = rows.map(([k,v]) => '<dt>' + esc(k) + '</dt><dd style="white-space:pre-line">' + esc(v) + '</dd>').join('');
@@ -653,6 +754,7 @@ function showRecap(num){
       curPdf = buildPdf(b);
       ['#aShare','#aEml','#aPdf'].forEach(s => $(s).disabled = false);
       $('#r-status').textContent = 'PDF prêt : ' + fileName(b) + ' (' + Math.max(1, Math.round(curPdf.size/1024)) + ' Ko).';
+      archiveStatus(b); if(isPending(b)) archiveBon(b, curPdf);
     } catch(err){ console.error(err); $('#r-status').textContent = 'Erreur pendant la création du PDF : ' + err.message; }
   }, 30);
 }
@@ -660,6 +762,125 @@ function markSent(){
   const list = hist(), b = list.find(x => x.numero === cur.numero); if(!b) return;
   b.statut = 'envoye'; b.sentAt = Date.now(); saveHist(list); showRecap(b.numero);
 }
+
+/* ---------- historique : archive chiffrée dans les tickets (issues) du dépôt GitHub ----------
+   Jeton « Issues » + clé propre au technicien reçus dans son lien. Le PDF complet (photos, signature)
+   et les données du bon sont chiffrés (AES-GCM 256) puis découpés en commentaires d'un ticket. */
+const CHUNK = 60000;
+const bytesB64 = u8 => { let s = ''; for(let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); };
+const b64Bytes = t => Uint8Array.from(atob(t), c => c.charCodeAt(0));
+async function aesKey(k){ return crypto.subtle.importKey('raw', unb64u(k), 'AES-GCM', false, ['encrypt','decrypt']); }
+async function seal(k, text){ const iv = crypto.getRandomValues(new Uint8Array(12)); const ct = new Uint8Array(await crypto.subtle.encrypt({ name:'AES-GCM', iv }, await aesKey(k), new TextEncoder().encode(text))); return { iv: bytesB64(iv), data: bytesB64(ct) }; }
+async function unseal(k, o){ return new TextDecoder().decode(await crypto.subtle.decrypt({ name:'AES-GCM', iv: b64Bytes(o.iv) }, await aesKey(k), b64Bytes(o.data))); }
+async function ghi(path, opt){
+  const s = rawSettings();
+  const r = await fetch('https://api.github.com/repos/' + REPO + '/' + path, { cache:'no-store', ...(opt || {}),
+    headers:{ 'Authorization':'Bearer ' + s.ht, 'Accept':'application/vnd.github+json', 'X-GitHub-Api-Version':'2022-11-28', ...((opt || {}).headers || {}) } });
+  if(!r.ok) throw new Error(r.status === 401 ? 'jeton historique refusé (expiré ?)' : r.status === 410 ? 'les tickets (Issues) sont désactivés sur le dépôt' : 'GitHub ' + r.status);
+  return r.json();
+}
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+let archiving = false;
+function archiveStatus(b){
+  const el = $('#r-arch'); if(!el) return;
+  if(!archOn()){ el.textContent = "Historique non activé sur cet appareil : demandez un nouveau lien à votre responsable."; el.style.color = 'var(--muted)'; return; }
+  el.style.color = b.archivedAt ? 'var(--ok)' : '';
+  el.textContent = b.archivedAt ? 'Archivé dans l\'historique le ' + fmtStamp(b.archivedAt) + '.' : 'Archivage dans l\'historique en attente…';
+}
+async function archiveBon(b, pdf){
+  if(archiving || !archOn() || !REPO || b.archivedAt) return;
+  archiving = true;
+  const s = rawSettings(), el = $('#r-arch');
+  try {
+    const payload = JSON.stringify({ v:1, file: fileName(b), data: dataOf(b), pdf: await blobB64(pdf || buildPdf(b)) });
+    const sealed = await seal(s.hk, payload), body = sealed.iv + ':' + sealed.data;
+    const parts = []; for(let i = 0; i < body.length; i += CHUNK) parts.push(body.slice(i, i + CHUNK));
+    const summary = await seal(s.hk, JSON.stringify({ numero: b.numero, date: b.date, client: b.client, codeClient: b.codeClient, type: b.typeInter || '',
+      tech: (b.tech.prenom + ' ' + b.tech.nom).trim(), entreprise: b.entreprise, validatedAt: b.validatedAt, photos: b.photos.length, parts: parts.length, size: body.length }));
+    const rid = bytesB64(crypto.getRandomValues(new Uint8Array(6))).replace(/[+/=]/g, '');
+    const old = (hist().find(x => x.numero === b.numero) || {}).archIssue;
+    if(old){ try { await ghi('issues/' + old, { method:'PATCH', body: JSON.stringify({ title: 'BI abandonné', state: 'closed' }) }); } catch(e){} }   // essai interrompu précédent
+    const issue = await ghi('issues', { method:'POST', body: JSON.stringify({ title: 'BI ' + s.hid + ' ' + rid,
+      body: 'Bon d\'intervention archivé (contenu chiffré, ne pas modifier).\n\n' + JSON.stringify(summary) }) });
+    { const l0 = hist(), h0 = l0.find(x => x.numero === b.numero); if(h0){ h0.archIssue = issue.number; saveHist(l0); } }
+    for(let i = 0; i < parts.length; i++){
+      if(el && cur && cur.numero === b.numero) el.textContent = 'Archivage dans l\'historique… ' + (i + 1) + ' / ' + parts.length;
+      await ghi('issues/' + issue.number + '/comments', { method:'POST', body: JSON.stringify({ body: 'part ' + (i + 1) + '/' + parts.length + '\n' + parts[i] }) });
+      await sleep(700);
+    }
+    const list = hist(), h = list.find(x => x.numero === b.numero);
+    if(h){ h.archivedAt = Date.now(); h.issue = issue.number; saveHist(list); }
+    b.archivedAt = Date.now();
+    if(cur && cur.numero === b.numero){ cur.archivedAt = b.archivedAt; archiveStatus(cur); }
+  } catch(e){
+    if(el && cur && cur.numero === b.numero){ el.textContent = 'Archivage reporté (' + e.message + ') : nouvel essai à la prochaine ouverture.'; el.style.color = 'var(--err)'; }
+  } finally { archiving = false; }
+}
+async function archivePending(){
+  for(const b of hist().filter(isPending)){ if(!window.jspdf) return; await archiveBon(b, null); if(isPending(hist().find(x => x.numero === b.numero) || {})) return; }
+}
+/* lecture de l'historique */
+let HIST = [];
+async function listIssues(){
+  const out = [];
+  for(let page = 1; page <= 10; page++){
+    const l = await ghi('issues?state=all&per_page=100&page=' + page);
+    out.push(...l.filter(i => !i.pull_request)); if(l.length < 100) break;
+  }
+  return out;
+}
+async function loadHistory(){
+  const s = rawSettings(), msg = $('#h-msg');
+  const pend = hist().filter(isPending);
+  if(!archOn()){ msg.textContent = "Historique non activé : demandez un nouveau lien à votre responsable."; HIST = []; renderHistory(pend); return; }
+  msg.textContent = 'Chargement de l\'historique…';
+  try {
+    const mine = (await listIssues()).filter(i => i.title.startsWith('BI ' + s.hid + ' '));
+    HIST = [];
+    for(const i of mine){
+      try { const j = JSON.parse(i.body.slice(i.body.indexOf('{'))); const o = JSON.parse(await unseal(s.hk, j)); if((i.comments ?? o.parts) >= o.parts) HIST.push({ ...o, issue: i.number }); } catch(e){ /* ticket illisible ou modifié */ }
+    }
+    HIST.sort((a, b) => (b.validatedAt || 0) - (a.validatedAt || 0));
+    msg.textContent = HIST.length + ' bon(s) archivé(s).';
+  } catch(e){ msg.textContent = 'Historique injoignable : ' + e.message + '.'; }
+  renderHistory(pend);
+}
+function renderHistory(pend){
+  const q = $('#h-search').value.trim().toLowerCase();
+  const f = x => !q || [x.numero, x.client, x.type, x.typeInter, x.codeClient].join(' ').toLowerCase().includes(q);
+  const p = (pend || hist().filter(isPending)).filter(f), l = HIST.filter(f);
+  $('#h-count').textContent = (l.length + p.length) + ' bon(s)';
+  $('#hist').innerHTML = p.map(b => `<div class="hi"><span class="n">${esc(b.numero)}</span><span class="pill valide">En attente</span><span class="c">${esc(b.client)}</span><span></span><span class="m">${fmtDate(b.date)} · archivage à la prochaine connexion</span></div>`).join('')
+    + l.map(x => `<div class="hi" data-row="${x.issue}"><span class="n">${esc(x.numero)}</span><span class="pill envoye">Archivé</span><span class="c">${esc(x.client)}</span><span></span><span class="m">${fmtDate(x.date)} · ${esc(x.type || '')} · ${x.photos || 0} photo(s)</span><span class="m" style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn small" data-issue="${x.issue}">Récupérer le bon</button></span></div>`).join('')
+    || '<div class="card"><p class="empty">Aucun bon archivé pour l\'instant.</p></div>';
+}
+const OPENED = {};
+async function openArchived(n, btn){
+  const s = rawSettings(), x = HIST.find(h => h.issue === n); if(!x) return;
+  const box = btn.parentElement;
+  try {
+    btn.disabled = true; btn.textContent = 'Téléchargement…';
+    let comments = [];
+    for(let page = 1; page <= 20; page++){ const l = await ghi('issues/' + n + '/comments?per_page=100&page=' + page); comments.push(...l); if(l.length < 100) break; }
+    const parts = comments.map(c => { const m = /^part (\d+)\/(\d+)\n/.exec(c.body); return m ? { i: +m[1], t: c.body.slice(m[0].length) } : null; }).filter(Boolean).sort((a, b) => a.i - b.i);
+    if(parts.length !== x.parts) throw new Error('archive incomplète (' + parts.length + '/' + x.parts + ')');
+    const body = parts.map(q => q.t).join(''), k = body.indexOf(':');
+    const payload = JSON.parse(await unseal(s.hk, { iv: body.slice(0, k), data: body.slice(k + 1) }));
+    OPENED[n] = payload;
+    box.innerHTML = '<button type="button" class="btn small primary" data-get="pdf" data-n="' + n + '">Ouvrir le PDF</button><button type="button" class="btn small" data-get="json" data-n="' + n + '">Données (.json)</button>';
+  } catch(e){ btn.disabled = false; btn.textContent = 'Réessayer'; box.insertAdjacentHTML('beforeend', '<span style="color:var(--err)">' + esc(e.name === 'OperationError' ? 'Archive altérée ou illisible.' : e.message) + '</span>'); }
+}
+$('#hist').addEventListener('click', e => {
+  const g = e.target.closest('[data-get]');
+  if(g){ const pl = OPENED[+g.dataset.n]; if(!pl) return;
+    if(g.dataset.get === 'pdf') download(new Blob([b64Bytes(pl.pdf)], { type:'application/pdf' }), pl.file);
+    else download(new Blob([JSON.stringify(pl.data, null, 2)], { type:'application/json' }), pl.file.replace(/\.pdf$/, '.json'));
+    return; }
+  const b = e.target.closest('[data-issue]'); if(b) openArchived(+b.dataset.issue, b);
+});
+$('#h-search').addEventListener('input', () => renderHistory());
+$('#navHist').onclick = () => { show('history'); loadHistory(); };
+$('#hBack').onclick = () => show('form');
 $('#aShare').onclick = () => {
   if(!curPdf) return; const b = cur, {to, cc} = recipients(b);
   copyText(to.join(', ') + (cc.length ? ', ' + cc.join(', ') : ''));
@@ -674,7 +895,7 @@ $('#aPdf').onclick = () => { if(curPdf) download(curPdf, fileName(cur)); };
 $('#aJson').onclick = () => { if(cur) download(jsonBlob(cur), jsonName(cur)); };
 $('#aCopy').onclick = () => { const {to, cc} = recipients(cur); copyText(to.concat(cc).join(', ')).then(ok => toast(ok ? 'Adresses copiées.' : 'Copie impossible : sélectionnez les adresses à la main.', !ok)); };
 $('#aSent').onclick = () => { markSent(); toast('Bon marqué comme envoyé.'); };
-$('#aNew').onclick = () => { store.set('bi.showRecap', false); show('form'); };
+$('#aNew').onclick = () => { store.set('bi.showRecap', false); saveHist(hist().filter(isPending)); show('form'); };   // bon envoyé : photos et signature effacées de l'appareil
 
 /* ---------- liste des clients (chiffrée, clé reçue dans le lien de configuration) ---------- */
 const K_CL = 'bi.clients';
@@ -724,10 +945,10 @@ $('#f-client').addEventListener('input', e => {
   const v = e.target.value, c = CLIENTS.find(x => cliLabel(x) === v);
   if(!c){ suggestClients(v); return; }
   e.target.value = c.nom;
-  Object.assign(draft, { client: c.nom, codeClient: c.code || '', departement: c.dept || '', site: c.site || draft.site,
-    adresse: [c.rue, [c.cp, c.ville].filter(Boolean).join(' ')].filter(Boolean).join('\n'),
+  Object.assign(draft, { client: c.nom, codeClient: c.code || '', departement: c.dept || '',
+    adresse: [c.site, c.rue, [c.cp, c.ville].filter(Boolean).join(' ')].filter(Boolean).join('\n'),
     contact: c.contact || draft.contact, clientEmail: c.email || draft.clientEmail });
-  ['codeClient','departement','site','adresse','contact','clientEmail'].forEach(k => $('#f-' + k).value = draft[k] || '');
+  ['codeClient','departement','adresse','contact','clientEmail'].forEach(k => $('#f-' + k).value = draft[k] || '');
   saveDraft(); toast('Client ' + c.nom + ' renseigné.');
 });
 
@@ -748,7 +969,7 @@ function decodeSetup(txt){
     code = code.split(/[&\s]/)[0].replace(/-/g,'+').replace(/_/g,'/'); while(code.length % 4) code += '=';
     const o = JSON.parse(decodeURIComponent(escape(atob(code))));
     if(!o || !o.prenom || !o.nom || !o.dest) return null;
-    const keep = ['prenom','nom','initiales','email','entreprise','dest','cc','ck'], s = {};
+    const keep = ['prenom','nom','initiales','email','entreprise','dest','cc','ck','ht','hk','hid'], s = {};
     keep.forEach(k => s[k] = String(o[k] || '').trim().slice(0, 200));
     s.initiales = (s.initiales || initialsOf(s.prenom, s.nom)).toUpperCase().replace(/[^A-Z]/g,'').slice(0,4);
     s.ccSelf = !!o.ccSelf; return s;
@@ -769,13 +990,22 @@ function fillEntreprises(){
 /* ---------- navigation ---------- */
 function show(v){
   if(v !== 'lock' && !configured()) v = 'lock';
-  ['form','recap','lock'].forEach(x => $('#view-'+x).hidden = x !== v);
+  ['form','recap','lock','history'].forEach(x => $('#view-'+x).hidden = x !== v);
+  $('#navHist').hidden = v === 'lock' || v === 'history';
   if(v === 'form'){ fillForm(); requestAnimationFrame(() => sizePad(true)); }
   window.scrollTo(0, 0);
 }
 
 /* ---------- démarrage ---------- */
 draft = store.get(K_DRAFT, null) || blankDraft();
+/* purge des données sur l'appareil : bons validés de plus de 7 jours, brouillons abandonnés depuis 30 jours */
+(() => {
+  const DAY = 864e5, now = Date.now();
+  const keep = hist().filter(b => isPending(b) || (store.get('bi.showRecap', false) && now - (b.validatedAt || 0) < 7 * DAY));
+  if(keep.length !== hist().length) saveHist(keep);
+  if(!keep.some(b => !isPending(b))) store.set('bi.showRecap', false);
+  if(draft.updatedAt && now - draft.updatedAt > 30 * DAY){ draft = blankDraft(); store.set(K_DRAFT, draft); setTimeout(() => toast('Brouillon de plus de 30 jours effacé.'), 800); }
+})();
 if(location.hash.indexOf('setup=') >= 0){
   const s = decodeSetup(location.hash), before = JSON.stringify(rawSettings());
   if(s){
@@ -785,14 +1015,23 @@ if(location.hash.indexOf('setup=') >= 0){
 }
 updWho(); fillEntreprises();
 suggestClients(''); loadClients().then(() => suggestClients($('#f-client').value));
+setTimeout(archivePending, 2500);
+/* logo par défaut de la fiche (logo.png du dépôt), remplaçable depuis la page admin */
+var DEFAULT_LOGO = null;
+fetch('logo.png').then(r => r.ok ? r.blob() : null).then(bl => bl && new Promise(res => {
+  const fr = new FileReader(); fr.onload = () => { const im = new Image(); im.onload = () => res({ data: fr.result, w: im.naturalWidth, h: im.naturalHeight }); im.onerror = () => res(null); im.src = fr.result; }; fr.readAsDataURL(bl);
+})).then(l => { DEFAULT_LOGO = l; }).catch(() => {});
 const lastSent = hist()[0];
 show(lastSent && lastSent.statut === 'valide' && store.get('bi.showRecap', false) ? 'recap' : 'form');
 if(lastSent && lastSent.statut === 'valide' && store.get('bi.showRecap', false)) showRecap(lastSent.numero);
 
 // valeurs communes : config.json à la racine du dépôt (gardé en mémoire pour le hors ligne)
-fetch('config.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(c => {
+(async () => {
+  if(REPO){ try { const r = await fetch('https://api.github.com/repos/' + REPO + '/contents/config.json', { cache:'no-store', headers:{ 'Accept':'application/vnd.github.raw+json' } }); if(r.ok) return await r.json(); } catch(e){} }
+  const r = await fetch('config.json?t=' + Date.now(), { cache: 'no-store' }); return r.ok ? r.json() : null;
+})().then(c => {
   if(!c || typeof c !== 'object') return;
-  CONF = c; store.set(K_CONF, c); fillEntreprises(); updWho();
+  CONF = c; store.set(K_CONF, c); fillEntreprises(); updWho(); if(!$('#view-form').hidden) fillTypes();
   const e = settings(); let changed = false;
   if(draft.statut === 'brouillon'){
     if(!draft.entreprise && e.entreprise){ draft.entreprise = e.entreprise; changed = true; }
