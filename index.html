@@ -10,7 +10,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-xRdTAcPk4LLp5dydBPY2uCxfhF3fj6rpQIG3/jnGSGM='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://api.github.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-iq9hxRv0OSN0Ar18Jh14fNjIRtqEmPqCnv/BYszJ4lo='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://api.github.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <style>
 /* polices hébergées dans le dépôt (aucun appel à Google Fonts) — IBM Plex, licence SIL OFL */
 @font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/ibm-plex-sans-latin-400-normal.woff2) format("woff2")}
@@ -210,6 +210,7 @@ dl.sum dd{margin:0;overflow-wrap:anywhere}
     <div><span class="lbl">Destinataires</span><output class="mails" id="f-dest"></output></div>
     <div><span class="lbl">Copie (Cc)</span><output class="mails" id="f-cc"></output></div>
     <label class="check"><input type="checkbox" id="f-sendClient"> Envoyer aussi au client (e-mail ci-dessus)</label>
+    <label class="check"><input type="checkbox" id="f-sendCom"> Mettre le commercial en copie <span id="comMailHint" style="color:var(--muted)"></span></label>
   </div>
 
   <div class="card">
@@ -361,7 +362,7 @@ function blankDraft(){
   const s = settings(), date = today();
   return { numero: newNumero(date, s.initiales), statut:'brouillon', entreprise: s.entreprise||'', date,
     client:'', codeClient:'', departement:'', nbTech:'1', typeInter:'', adresse:'', contact:'', clientEmail:'', comPrenom:'', comNom:'', comEmail:'', debut:'', fin:'', pause:'0', objet:'', travaux:'', obs:'',
-    dest: s.dest||'', cc: defaultCc(s), sendClient:false, materiel:[], photos:[], signature:null, signNom:'',
+    dest: s.dest||'', cc: defaultCc(s), sendClient:false, sendCom:true, materiel:[], photos:[], signature:null, signNom:'',
     tech: techOf(s), createdAt: Date.now() };
 }
 let saveT;
@@ -372,7 +373,7 @@ function fillForm(){
   if(cfg.entreprise && draft.entreprise !== cfg.entreprise){ draft.entreprise = cfg.entreprise; saveDraft(); }
   fillTypes();
   FIELDS.forEach(k => { $('#f-'+k).value = draft[k] ?? ''; });
-  $('#f-sendClient').checked = !!draft.sendClient;
+  $('#f-sendClient').checked = !!draft.sendClient; $('#f-sendCom').checked = draft.sendCom !== false; comHint();
   $('#numero').textContent = fullNum(draft);
   const t = draft.tech;
   $('#i-tech').textContent = t.prenom ? t.prenom + ' ' + t.nom + ' (' + t.initiales + ')' : '—';
@@ -391,6 +392,7 @@ $('#view-form').addEventListener('input', e => {
   if(el.id && el.id.startsWith('f-')){
     const k = el.id.slice(2);
     if(k === 'sendClient'){ draft.sendClient = el.checked; }
+    else if(k === 'sendCom'){ draft.sendCom = el.checked; saveDraft(); }
     else if(FIELDS.includes(k)){
       draft[k] = el.value;
       if(k === 'date' && el.value){ draft.numero = rebuildNumero(draft.numero, el.value, draft.tech.initiales); }
@@ -403,6 +405,9 @@ $('#view-form').addEventListener('input', e => {
   }
 });
 $('#f-sendClient').addEventListener('change', e => { draft.sendClient = e.target.checked; saveDraft(); });
+$('#f-sendCom').addEventListener('change', e => { draft.sendCom = e.target.checked; saveDraft(); });
+function comHint(){ const m = String($('#f-comEmail').value || draft.comEmail || '').trim(); $('#comMailHint').textContent = m ? '(' + m + ')' : '(aucun e-mail de commercial renseigné)'; }
+$('#f-comEmail').addEventListener('input', comHint);
 
 /* ---------- matériel ---------- */
 function renderMat(){
@@ -494,7 +499,9 @@ let rsT; window.addEventListener('resize', () => { clearTimeout(rsT); rsT = setT
 function recipients(b){
   const to = emails(b.dest);
   if(b.sendClient && b.clientEmail && !to.includes(b.clientEmail.trim())) to.push(b.clientEmail.trim());
-  return { to, cc: emails(b.cc).filter(x => !to.includes(x)) };
+  const cc = emails(b.cc), cm = String(b.comEmail || '').trim();
+  if(b.sendCom !== false && cm && !cc.includes(cm)) cc.push(cm);
+  return { to, cc: cc.filter(x => !to.includes(x)) };
 }
 function check(){
   const err = [];
@@ -960,7 +967,7 @@ $('#f-client').addEventListener('input', e => {
     contact: c.contact || draft.contact, clientEmail: c.email || draft.clientEmail,
     comPrenom: c.comPrenom || '', comNom: c.comNom || '', comEmail: c.comEmail || '' });
   ['codeClient','departement','adresse','contact','clientEmail','comPrenom','comNom','comEmail'].forEach(k => $('#f-' + k).value = draft[k] || '');
-  saveDraft(); toast('Client ' + c.nom + ' renseigné.');
+  comHint(); saveDraft(); toast('Client ' + c.nom + ' renseigné.');
 });
 
 /* ---------- configuration (uniquement par lien) ---------- */
