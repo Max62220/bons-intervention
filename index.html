@@ -10,7 +10,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-COyWMqj/8gOBLmMTB17RXMeQqAY0I6k4ZkXZ39SzAlk='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://api.github.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-xRdTAcPk4LLp5dydBPY2uCxfhF3fj6rpQIG3/jnGSGM='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://api.github.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <style>
 /* polices hébergées dans le dépôt (aucun appel à Google Fonts) — IBM Plex, licence SIL OFL */
 @font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/ibm-plex-sans-latin-400-normal.woff2) format("woff2")}
@@ -162,6 +162,12 @@ dl.sum dd{margin:0;overflow-wrap:anywhere}
       <label class="f">Contact sur place<input type="text" id="f-contact" autocomplete="off"></label>
       <label class="f">E-mail du client<input type="email" id="f-clientEmail" inputmode="email" autocomplete="off"></label>
     </div>
+    <span class="lbl" style="margin-top:4px">Commercial en charge du client</span>
+    <div class="row">
+      <label class="f">Prénom<input type="text" id="f-comPrenom" autocomplete="off"></label>
+      <label class="f">Nom<input type="text" id="f-comNom" autocomplete="off"></label>
+    </div>
+    <label class="f">E-mail du commercial<input type="email" id="f-comEmail" inputmode="email" autocomplete="off"></label>
   </div>
 
   <div class="card">
@@ -349,12 +355,12 @@ function defaultCc(s){ const l = emails(s.cc); if(s.ccSelf && s.email && !l.incl
 function techOf(s){ return { prenom: s.prenom||'', nom: s.nom||'', initiales: s.initiales||'', email: s.email||'' }; }
 
 /* ---------- brouillon ---------- */
-const FIELDS = ['entreprise','date','client','codeClient','departement','nbTech','typeInter','adresse','contact','clientEmail','debut','fin','pause','objet','travaux','obs','dest','cc','signNom'];
+const FIELDS = ['entreprise','date','client','codeClient','departement','nbTech','typeInter','adresse','contact','clientEmail','comPrenom','comNom','comEmail','debut','fin','pause','objet','travaux','obs','dest','cc','signNom'];
 let draft;
 function blankDraft(){
   const s = settings(), date = today();
   return { numero: newNumero(date, s.initiales), statut:'brouillon', entreprise: s.entreprise||'', date,
-    client:'', codeClient:'', departement:'', nbTech:'1', typeInter:'', adresse:'', contact:'', clientEmail:'', debut:'', fin:'', pause:'0', objet:'', travaux:'', obs:'',
+    client:'', codeClient:'', departement:'', nbTech:'1', typeInter:'', adresse:'', contact:'', clientEmail:'', comPrenom:'', comNom:'', comEmail:'', debut:'', fin:'', pause:'0', objet:'', travaux:'', obs:'',
     dest: s.dest||'', cc: defaultCc(s), sendClient:false, materiel:[], photos:[], signature:null, signNom:'',
     tech: techOf(s), createdAt: Date.now() };
 }
@@ -499,6 +505,7 @@ function check(){
   const {to, cc} = recipients(draft);
   if(!to.length) err.push('au moins un destinataire');
   [...to, ...cc].filter(a => !EMAIL_RE.test(a)).forEach(a => err.push('une adresse valide à la place de « ' + a + ' »'));
+  if(draft.comEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(draft.comEmail).trim())) err.push("un e-mail du commercial valide");
   if(draft.sendClient && !draft.clientEmail) err.push("l'e-mail du client (case « Envoyer aussi au client » cochée)");
   draft.materiel.forEach((m,i) => { if(!m.ref.trim() && !m.des.trim()) err.push('la référence de la pièce n° ' + (i+1) + ' (ou supprimez la ligne)'); });
   if(draft.departement && !/^(\d{2,3}|2[AB])$/i.test(draft.departement.trim())) err.push('un département valide (ex. 59, 2A, 971)');
@@ -564,8 +571,8 @@ function buildPdf(b){
   y += 20;
 
   /* client */
-  const split = 122, h1 = 15, h2 = 15;
-  frame(M, y, CW, h1 + h2);
+  const split = 122, h1 = 15, h2 = 15, h3 = 9;
+  frame(M, y, CW, h1 + h2 + h3); doc.setDrawColor(...BLUE); doc.line(M, y + h1 + h2, M + CW, y + h1 + h2);
   doc.setDrawColor(...BLUE); doc.line(M, y + h1, M + CW, y + h1); doc.line(M + split, y, M + split, y + h1 + h2);
   let w = chip(M + 2, y + 2, 'NOM - CLIENT - FACTURE');
   doc.setFontSize(11.5); doc.setFont('helvetica','bold');
@@ -577,7 +584,9 @@ function buildPdf(b){
   txt((b.codeClient || '-') + (b.departement ? '      Dépt ' + b.departement : ''), M + w + 5, y + h1 + 6.2, 11.5, true);
   chip(M + split + 2, y + h1 + 2, 'CONTACT');
   [b.contact, b.clientEmail].filter(Boolean).slice(0, 2).forEach((l, k) => txt(l, M + split + 2.5, y + h1 + 11 + k * 3.4, 8));
-  y += h1 + h2 + 4;
+  w = chip(M + 2, y + h1 + h2 + 1.8, 'COMMERCIAL EN CHARGE');
+  txt([b.comPrenom, b.comNom].map(x => String(x || '').trim()).filter(Boolean).join(' ') || '-', M + w + 5, y + h1 + h2 + 6, 10.5, true);
+  y += h1 + h2 + h3 + 4;
 
   /* horaires */
   doc.autoTable({ startY: y, margin:{ left:M, right:M }, theme:'grid',
@@ -669,7 +678,14 @@ const b64u = s => btoa(unescape(encodeURIComponent(s)));
 const encH = s => /^[\x20-\x7e]*$/.test(s) ? s : '=?UTF-8?B?' + b64u(s) + '?=';
 const wrap76 = s => s.replace(/(.{76})/g, '$1\r\n');
 function blobB64(blob){ return new Promise(res => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.readAsDataURL(blob); }); }
-function fileName(b){ return 'BI_' + b.numero + '_' + (b.client||'').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Za-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40) + '.pdf'; }
+/* Nom des fichiers : Département-CodeClient-JJMMAA-Client-Entreprise-Type (le n° du bon reste dans le PDF et le .json) */
+const fnPart = v => String(v || '').replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/^[.\s]+|[.\s]+$/g, '');
+function fileName(b){
+  const d = String(b.date || '').split('-'), jjmmaa = d.length === 3 ? d[2] + d[1] + d[0].slice(2) : '';
+  const name = [b.departement, b.codeClient, jjmmaa, String(b.client || '').slice(0, 60), b.entreprise, b.typeInter ? typeSlug(b.typeInter) : '']
+    .map(fnPart).filter(Boolean).join('-');
+  return (name || 'Bon-' + b.numero) + '.pdf';
+}
 function dataOf(b){
   const t = b.tech, d = b.duree || 0, n = nbOf(b), h = x => Math.round(x / 60 * 100) / 100;
   return {
@@ -678,6 +694,7 @@ function dataOf(b){
     entreprise: b.entreprise, technicien: (t.prenom + ' ' + t.nom).trim(), initialesTechnicien: t.initiales,
     departement: String(b.departement || '').trim().toUpperCase(), codeClient: String(b.codeClient || '').trim(),
     client: b.client, typeIntervention: b.typeInter || '', site: b.site || '', adresse: b.adresse, contact: b.contact, emailClient: b.clientEmail,
+    commercialPrenom: b.comPrenom || '', commercialNom: b.comNom || '', commercialEmail: b.comEmail || '',
     objet: b.objet, travaux: b.travaux, observations: b.obs,
     arrivee: b.debut, depart: b.fin, pauseMin: Number(b.pause) || 0,
     heuresSurPlace: h(d), nbIntervenants: n, heuresMainOeuvre: h(d * n),
@@ -732,7 +749,7 @@ function showRecap(num){
   $('#r-num').textContent = b.numero; const p = $('#r-pill'); p.className = 'pill ' + pc; p.textContent = pl;
   const rows = [['Client', b.client], ['Type', b.typeInter || '—'], ['Code client', (b.codeClient || '—') + (b.departement ? ' · dépt ' + b.departement : '')], ['Date', fmtDate(b.date)], ['Horaires', b.debut + ' – ' + b.fin + (Number(b.pause) ? ' (pause ' + b.pause + ' min)' : '')],
     ['Temps passé', fmtDuree(b.duree) + (nbOf(b) > 1 ? ' × ' + nbOf(b) + ' intervenants = ' + fmtDuree(b.duree * nbOf(b)) : '')], ['Matériel', b.materiel.length ? b.materiel.map(m => (m.qte||'') + ' × ' + (m.ref||'') + ' ' + (m.des||'')).join('\n') : 'Aucun'],
-    ['Photos', String(b.photos.length)], ['Entreprise', b.entreprise], ['Signé par', b.signNom]];
+    ['Commercial', [b.comPrenom, b.comNom].filter(Boolean).join(' ') || '—'], ['Photos', String(b.photos.length)], ['Entreprise', b.entreprise], ['Signé par', b.signNom]];
   $('#r-sum').innerHTML = rows.map(([k,v]) => '<dt>' + esc(k) + '</dt><dd style="white-space:pre-line">' + esc(v) + '</dd>').join('');
   $('#r-to').textContent = to.join(', '); $('#r-cc').textContent = cc.join(', '); $('#r-ccwrap').hidden = !cc.length;
   $('#aShare').hidden = !canShareFiles;
@@ -940,8 +957,9 @@ $('#f-client').addEventListener('input', e => {
   e.target.value = c.nom;
   Object.assign(draft, { client: c.nom, codeClient: c.code || '', departement: c.dept || '',
     adresse: [c.site, c.rue, [c.cp, c.ville].filter(Boolean).join(' ')].filter(Boolean).join('\n'),
-    contact: c.contact || draft.contact, clientEmail: c.email || draft.clientEmail });
-  ['codeClient','departement','adresse','contact','clientEmail'].forEach(k => $('#f-' + k).value = draft[k] || '');
+    contact: c.contact || draft.contact, clientEmail: c.email || draft.clientEmail,
+    comPrenom: c.comPrenom || '', comNom: c.comNom || '', comEmail: c.comEmail || '' });
+  ['codeClient','departement','adresse','contact','clientEmail','comPrenom','comNom','comEmail'].forEach(k => $('#f-' + k).value = draft[k] || '');
   saveDraft(); toast('Client ' + c.nom + ' renseigné.');
 });
 

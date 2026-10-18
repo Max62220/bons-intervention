@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#0b6e6e">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-1WxOQ7tC/cRHy1C0hH4MkANxRjTrKsXG55uaxtP2xD0='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://api.github.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-gzYuHuL2wD9ySxiQ3zSJ73H4ajJ7i628D7wIXgct+pk='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://api.github.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <style>
 /* polices hébergées dans le dépôt (aucun appel à Google Fonts) — IBM Plex, licence SIL OFL */
 @font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/ibm-plex-sans-latin-400-normal.woff2) format("woff2")}
@@ -217,6 +217,11 @@ details .body{display:flex;flex-direction:column;gap:10px;margin-top:8px}
             <label class="f">Contact sur place<input type="text" id="c-contact" autocomplete="off"></label>
             <label class="f">E-mail du client<input type="email" id="c-email" autocomplete="off"></label>
           </div>
+          <div class="row">
+            <label class="f">Prénom du commercial<input type="text" id="c-comPrenom" autocomplete="off"></label>
+            <label class="f">Nom du commercial<input type="text" id="c-comNom" autocomplete="off"></label>
+          </div>
+          <label class="f">E-mail du commercial<input type="email" id="c-comEmail" autocomplete="off"></label>
           <div class="btns"><button type="button" class="btn primary" id="cSave">Enregistrer le client</button><button type="button" class="btn" id="cCancel">Annuler</button></div>
         </div>
       </details>
@@ -536,12 +541,12 @@ function renderCl(){
   const hit = q ? all.filter(c => [c.nom, c.code, c.ville, c.site, c.cp].join(' ').toLowerCase().includes(q)) : all;
   $('#clCount').textContent = all.length;
   const shown = hit.slice(0, 40);
-  $('#clList').innerHTML = shown.map(c => `<div class="item"><div style="min-width:0"><b>${esc(c.nom)}</b><span>${esc([c.code ? 'Code ' + c.code : '', c.dept ? 'dépt ' + c.dept : '', c.site, [c.cp, c.ville].filter(Boolean).join(' ')].filter(Boolean).join(' · '))}</span>${c.contact || c.email ? `<span>${esc([c.contact, c.email].filter(Boolean).join(' · '))}</span>` : ''}</div>
+  $('#clList').innerHTML = shown.map(c => `<div class="item"><div style="min-width:0"><b>${esc(c.nom)}</b><span>${esc([c.code ? 'Code ' + c.code : '', c.dept ? 'dépt ' + c.dept : '', c.site, [c.cp, c.ville].filter(Boolean).join(' ')].filter(Boolean).join(' · '))}</span>${c.contact || c.email ? `<span>${esc([c.contact, c.email].filter(Boolean).join(' · '))}</span>` : ''}${c.comNom || c.comPrenom ? `<span>Commercial : ${esc([[c.comPrenom, c.comNom].filter(Boolean).join(' '), c.comEmail].filter(Boolean).join(' · '))}</span>` : ''}</div>
     <button type="button" class="btn small" data-cedit="${esc(clKey(c))}">Modifier</button><button type="button" class="btn small" data-cdel="${esc(clKey(c))}" aria-label="Supprimer">✕</button></div>`).join('')
     + (hit.length > shown.length ? `<p class="empty">… et ${hit.length - shown.length} autre(s) : affinez la recherche.</p>` : '')
     + (!all.length ? '<p class="empty">Aucun client. Ajoutez-en un ou importez une liste depuis Excel.</p>' : !hit.length ? '<p class="empty">Aucun client ne correspond.</p>' : '');
 }
-const CF = ['nom','code','dept','site','rue','cp','ville','contact','email'];
+const CF = ['nom','code','dept','site','rue','cp','ville','contact','email','comPrenom','comNom','comEmail'];
 function fillCl(c){ CF.forEach(k => $('#c-' + k).value = (c && c[k]) || ''); }
 $('#clSearch').addEventListener('input', renderCl);
 $('#c-cp').addEventListener('input', e => { if(!$('#c-dept').value || $('#c-dept').dataset.auto){ $('#c-dept').value = deptOf(e.target.value); $('#c-dept').dataset.auto = '1'; } });
@@ -550,6 +555,7 @@ $('#cSave').onclick = () => {
   const c = {}; CF.forEach(k => c[k] = $('#c-' + k).value.trim());
   if(!c.nom){ toast('Le nom du client est obligatoire.'); return; }
   if(c.email && !EMAIL_RE.test(c.email)){ toast('E-mail du client invalide.'); return; }
+  if(c.comEmail && !EMAIL_RE.test(c.comEmail)){ toast('E-mail du commercial invalide.'); return; }
   c.dept = c.dept.toUpperCase() || deptOf(c.cp);
   let l = getCl(); if(clEdit) l = l.filter(x => clKey(x) !== clEdit);
   putCl(mergeCl(l, [c])); clEdit = null; fillCl(null); $('#clFormTitle').textContent = 'Ajouter un client'; $('#clFormBox').open = false;
@@ -568,7 +574,9 @@ $('#clList').addEventListener('click', e => {
 /* import par copier-coller depuis Excel */
 const HDR = { code:/^(bp sold to|code client|code|n° ?client|num[ée]ro client|customer( \(sold-to\))?)$/i, nom:/^(bp sold to name ?1|nom|client|soci[ée]t[ée]|raison sociale|name|nom client)$/i,
   rue:/^(street|rue|adresse|address)$/i, num:/^(haus number|house number|n°|num[ée]ro)$/i, cp:/^(post ?code|code postal|cp)$/i, ville:/^(city|ville|city \/ district|commune)$/i,
-  dept:/^(dpt|d[ée]partement|dept)$/i, contact:/^(contact|interlocuteur)$/i, email:/^(e-?mail|mail|courriel)$/i, site:/^(site|b[âa]timent)$/i };
+  dept:/^(dpt|d[ée]partement|dept)$/i, contact:/^(contact|interlocuteur)$/i, email:/^(e-?mail|mail|courriel)$/i, site:/^(site|b[âa]timent)$/i,
+  comPrenom:/^pr[ée]nom (du )?(commercial|vendeur|sales ?rep)$/i, comNom:/^(nom (du )?(commercial|vendeur|sales ?rep)|commercial|vendeur|sales ?rep)$/i,
+  comEmail:/^(e-?mail|mail|courriel) (du )?(commercial|vendeur|sales ?rep)$/i };
 let clParsed = [];
 function parsePaste(text){
   const rows = text.split(/\r?\n/).filter(r => r.trim()).map(r => r.split('\t').map(x => x.trim()));
@@ -581,7 +589,8 @@ function parsePaste(text){
   const list = body.map(r => {
     const cp = g(r, 'cp').replace(/\D/g, '').padStart(5, '0').slice(-5), num = g(r, 'num');
     const c = { nom:g(r, 'nom'), code:g(r, 'code').replace(/\.0$/, ''), rue:(num ? num + ' ' : '') + g(r, 'rue'), cp: g(r, 'cp') ? cp : '', ville:g(r, 'ville'),
-      dept:(g(r, 'dept') || deptOf(cp)).toUpperCase(), contact:g(r, 'contact'), email:g(r, 'email'), site:g(r, 'site') };
+      dept:(g(r, 'dept') || deptOf(cp)).toUpperCase(), contact:g(r, 'contact'), email:g(r, 'email'), site:g(r, 'site'),
+      comPrenom:g(r, 'comPrenom'), comNom:g(r, 'comNom'), comEmail:g(r, 'comEmail') };
     c.nom = c.nom.replace(/^#\s*/, '');
     return c;
   }).filter(c => c.nom);
