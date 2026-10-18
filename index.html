@@ -10,7 +10,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-x/0MLnv2SkBnKVCmkZVERUCNAVtUxbG8arXshGcSla8='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://api.github.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-COyWMqj/8gOBLmMTB17RXMeQqAY0I6k4ZkXZ39SzAlk='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://api.github.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <style>
 /* polices hébergées dans le dépôt (aucun appel à Google Fonts) — IBM Plex, licence SIL OFL */
 @font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/ibm-plex-sans-latin-400-normal.woff2) format("woff2")}
@@ -240,11 +240,8 @@ dl.sum dd{margin:0;overflow-wrap:anywhere}
     <p class="hint" id="r-status">Préparation du PDF…</p>
     <div class="actions">
       <button type="button" class="btn primary" id="aShare" hidden disabled>Envoyer avec mon application e-mail</button>
-      <button type="button" class="btn" id="aEml" disabled>Ouvrir un brouillon dans Outlook (.eml)</button>
-      <button type="button" class="btn" id="aPdf" disabled>Télécharger le PDF</button>
+      <button type="button" class="btn" id="aEml" disabled>Ouvrir dans Outlook (sur PC)</button>
       <button type="button" class="btn small" id="aJson">Télécharger les données du bon (.json)</button>
-      <button type="button" class="btn small" id="aCopy">Copier les destinataires</button>
-      <a class="btn link" id="aMailto" href="#">E-mail sans pièce jointe (dernier recours)</a>
     </div>
     <p class="hint" id="r-help"></p>
     <p class="hint" id="r-arch"></p>
@@ -743,16 +740,14 @@ function showRecap(num){
   $('#r-help').textContent = canShareFiles
     ? "Sur téléphone : « Envoyer » ouvre le menu de partage avec le PDF joint. Choisissez Outlook ou Mail, puis collez les destinataires (ils sont copiés automatiquement)."
     : "Sur ordinateur : le fichier .eml s'ouvre dans Outlook comme un nouveau message avec le PDF déjà joint et les destinataires remplis. Il reste à cliquer sur Envoyer.";
-  $('#aMailto').href = 'mailto:' + to.map(encodeURIComponent).join(',') + '?' + (cc.length ? 'cc=' + cc.map(encodeURIComponent).join(',') + '&' : '') +
-    'subject=' + encodeURIComponent(subjectOf(b)) + '&body=' + encodeURIComponent(bodyOf(b) + '\n\n(PDF à joindre : téléchargez-le depuis l’application.)');
   $('#aSent').hidden = b.statut === 'envoye';
-  ['#aShare','#aEml','#aPdf'].forEach(s => $(s).disabled = true);
+  ['#aShare','#aEml'].forEach(s => $(s).disabled = true);
   $('#r-status').textContent = 'Préparation du PDF…';
   setTimeout(() => {
     if(!window.jspdf || !window.jspdf.jsPDF){ $('#r-status').textContent = "Le générateur de PDF n'est pas chargé. Ouvrez l'application une fois avec du réseau, puis réessayez."; return; }
     try {
       curPdf = buildPdf(b);
-      ['#aShare','#aEml','#aPdf'].forEach(s => $(s).disabled = false);
+      ['#aShare','#aEml'].forEach(s => $(s).disabled = false);
       $('#r-status').textContent = 'PDF prêt : ' + fileName(b) + ' (' + Math.max(1, Math.round(curPdf.size/1024)) + ' Ko).';
       archiveStatus(b); if(isPending(b)) archiveBon(b, curPdf);
     } catch(err){ console.error(err); $('#r-status').textContent = 'Erreur pendant la création du PDF : ' + err.message; }
@@ -891,9 +886,7 @@ $('#aShare').onclick = () => {
     .catch(err => { if(err && err.name !== 'AbortError') toast('Le partage a échoué : ' + err.message, true); });
 };
 $('#aEml').onclick = async () => { if(!curPdf) return; download(await buildEml(cur, curPdf), fileName(cur).replace(/\.pdf$/, '.eml')); toast('Ouvrez le fichier .eml téléchargé : le message est prêt.'); };
-$('#aPdf').onclick = () => { if(curPdf) download(curPdf, fileName(cur)); };
 $('#aJson').onclick = () => { if(cur) download(jsonBlob(cur), jsonName(cur)); };
-$('#aCopy').onclick = () => { const {to, cc} = recipients(cur); copyText(to.concat(cc).join(', ')).then(ok => toast(ok ? 'Adresses copiées.' : 'Copie impossible : sélectionnez les adresses à la main.', !ok)); };
 $('#aSent').onclick = () => { markSent(); toast('Bon marqué comme envoyé.'); };
 $('#aNew').onclick = () => { store.set('bi.showRecap', false); saveHist(hist().filter(isPending)); show('form'); };   // bon envoyé : photos et signature effacées de l'appareil
 
