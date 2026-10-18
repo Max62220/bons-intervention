@@ -10,7 +10,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-iq9hxRv0OSN0Ar18Jh14fNjIRtqEmPqCnv/BYszJ4lo='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://api.github.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-IVDvhp2/NwBPeGdlzd0FAPsoOi+ZQ4tovpYZR9mgSKc='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://api.github.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <style>
 /* polices hébergées dans le dépôt (aucun appel à Google Fonts) — IBM Plex, licence SIL OFL */
 @font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/ibm-plex-sans-latin-400-normal.woff2) format("woff2")}
@@ -248,7 +248,6 @@ dl.sum dd{margin:0;overflow-wrap:anywhere}
     <div class="actions">
       <button type="button" class="btn primary" id="aShare" hidden disabled>Envoyer avec mon application e-mail</button>
       <button type="button" class="btn" id="aEml" disabled>Ouvrir dans Outlook (sur PC)</button>
-      <button type="button" class="btn small" id="aJson">Télécharger les données du bon (.json)</button>
     </div>
     <p class="hint" id="r-help"></p>
     <p class="hint" id="r-arch"></p>
@@ -711,10 +710,11 @@ function dataOf(b){
 }
 const jsonName = b => fileName(b).replace(/\.pdf$/, '.json');
 const jsonBlob = b => new Blob([JSON.stringify(dataOf(b), null, 2)], { type: 'application/json' });
-function subjectOf(b){ return "Bon d'intervention " + b.numero + ' - ' + b.client; }
+const bonName = b => fileName(b).replace(/\.pdf$/, '');   // Département-CodeClient-JJMMAA-Client-Entreprise-Type
+function subjectOf(b){ return "Bon d'intervention " + bonName(b); }
 function bodyOf(b){
   const t = b.tech, mat = b.materiel.length;
-  return 'Bonjour,\n\nVeuillez trouver ci-joint le bon d’intervention N° ' + b.numero + ' du ' + fmtDate(b.date) + '.\n\n' +
+  return 'Bonjour,\n\nVeuillez trouver ci-joint le bon d’intervention ' + bonName(b) + ' du ' + fmtDate(b.date) + ' (N° ' + b.numero + ').\n\n' +
     'Client : ' + b.client + (b.codeClient ? ' - code ' + b.codeClient : '') + '\n' +
     (b.typeInter ? "Type d'intervention : " + b.typeInter + '\n' : '') +
     'Horaires : ' + b.debut + ' - ' + b.fin + (Number(b.pause) ? ', pause ' + b.pause + ' min' : '') + '\n' +
@@ -886,7 +886,7 @@ async function openArchived(n, btn){
     const body = parts.map(q => q.t).join(''), k = body.indexOf(':');
     const payload = JSON.parse(await unseal(s.hk, { iv: body.slice(0, k), data: body.slice(k + 1) }));
     OPENED[n] = payload;
-    box.innerHTML = '<button type="button" class="btn small primary" data-get="pdf" data-n="' + n + '">Ouvrir le PDF</button><button type="button" class="btn small" data-get="json" data-n="' + n + '">Données (.json)</button>';
+    box.innerHTML = '<button type="button" class="btn small primary" data-get="pdf" data-n="' + n + '">Ouvrir le PDF</button>';
   } catch(e){ btn.disabled = false; btn.textContent = 'Réessayer'; box.insertAdjacentHTML('beforeend', '<span style="color:var(--err)">' + esc(e.name === 'OperationError' ? 'Archive altérée ou illisible.' : e.message) + '</span>'); }
 }
 $('#hist').addEventListener('click', e => {
@@ -910,7 +910,6 @@ $('#aShare').onclick = () => {
     .catch(err => { if(err && err.name !== 'AbortError') toast('Le partage a échoué : ' + err.message, true); });
 };
 $('#aEml').onclick = async () => { if(!curPdf) return; download(await buildEml(cur, curPdf), fileName(cur).replace(/\.pdf$/, '.eml')); toast('Ouvrez le fichier .eml téléchargé : le message est prêt.'); };
-$('#aJson').onclick = () => { if(cur) download(jsonBlob(cur), jsonName(cur)); };
 $('#aSent').onclick = () => { markSent(); toast('Bon marqué comme envoyé.'); };
 $('#aNew').onclick = () => { store.set('bi.showRecap', false); saveHist(hist().filter(isPending)); show('form'); };   // bon envoyé : photos et signature effacées de l'appareil
 
