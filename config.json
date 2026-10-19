@@ -8,6 +8,7 @@
   ],
   "types": [
     "Réparation",
+    "Atelier",
     "Vérification",
     "Mise en route",
     "Installation",
