@@ -24,5 +24,8 @@
     "adresse": "10 avenue Aristide Briand\n92220 Bagneux",
     "tel": "",
     "email": ""
+  },
+  "portEmballage": {
+    "prix": 32
   }
 }
