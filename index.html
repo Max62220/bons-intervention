@@ -10,7 +10,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-IVDvhp2/NwBPeGdlzd0FAPsoOi+ZQ4tovpYZR9mgSKc='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://api.github.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-+WrWc0AfvNyg4eENvL5/toE6ep6ehkOCP6imQZyTbMg='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://api.github.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <style>
 /* polices hébergées dans le dépôt (aucun appel à Google Fonts) — IBM Plex, licence SIL OFL */
 @font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/ibm-plex-sans-latin-400-normal.woff2) format("woff2")}
@@ -190,6 +190,7 @@ dl.sum dd{margin:0;overflow-wrap:anywhere}
   <div class="card">
     <h2>Matériel remplacé <span id="matCount"></span></h2>
     <div class="mat" id="mat"></div>
+    <p class="hint">Ajoutés automatiquement sur la fiche : main d'œuvre (SER00154), déplacement (SER00156) et, en dernière ligne, MOP – Forfait port et emballage (1).</p>
     <button type="button" class="btn small" id="addMat">+ Ajouter une pièce</button>
   </div>
 
@@ -373,7 +374,7 @@ function fillForm(){
   fillTypes();
   FIELDS.forEach(k => { $('#f-'+k).value = draft[k] ?? ''; });
   $('#f-sendClient').checked = !!draft.sendClient; $('#f-sendCom').checked = draft.sendCom !== false; comHint();
-  $('#numero').textContent = fullNum(draft);
+  $('#numero').textContent = ficheNum(draft);
   const t = draft.tech;
   $('#i-tech').textContent = t.prenom ? t.prenom + ' ' + t.nom + ' (' + t.initiales + ')' : '—';
   const em = $('#i-email'); em.textContent = t.email || 'Non renseigné'; em.style.color = t.email ? '' : 'var(--err)';
@@ -395,7 +396,7 @@ $('#view-form').addEventListener('input', e => {
     else if(FIELDS.includes(k)){
       draft[k] = el.value;
       if(k === 'date' && el.value){ draft.numero = rebuildNumero(draft.numero, el.value, draft.tech.initiales); }
-      if(k === 'date' || k === 'typeInter') $('#numero').textContent = fullNum(draft);
+      if(['date','typeInter','departement','codeClient','client'].includes(k)) $('#numero').textContent = ficheNum(draft);
       if(k === 'debut' || k === 'fin' || k === 'pause' || k === 'nbTech') updDuree();
     }
     saveDraft();
@@ -526,7 +527,7 @@ $('#btnValidate').onclick = () => {
     box.hidden = false; box.scrollIntoView({behavior:'smooth', block:'center'}); return;
   }
   box.hidden = true;
-  const b = { ...draft, numero: fullNum(draft), statut:'valide', validatedAt: Date.now(), duree: dureeMin(draft.debut, draft.fin, draft.pause) };
+  const b = { ...draft, numero: fullNum(draft), portPrix: portPrix(), statut:'valide', validatedAt: Date.now(), duree: dureeMin(draft.debut, draft.fin, draft.pause) };
   const list = hist().filter(x => x.numero !== b.numero); list.unshift(b);
   if(!saveHist(list)) return;
   store.set('bi.used', [b.numero, ...usedNums()].slice(0, 500)); store.set('bi.showRecap', true);
@@ -573,7 +574,9 @@ function buildPdf(b){
   const addr = [...String(E.adresse || '').split(/\n/), [E.tel ? 'Tél. : ' + E.tel : '', E.email].filter(Boolean).join(' · ')].filter(x => x.trim());
   addr.slice(0, 4).forEach((l, k) => txt(l, hx, y + 3 + k * 3.4, 7, false, MUT));
   txt("FICHE D'INTERVENTION", W - M, y + 7, 15, true, BLUE, { align:'right' });
-  doc.setFont('courier','bold'); doc.setFontSize(9.5); doc.setTextColor(...INK); doc.text('N° ' + b.numero, W - M, y + 13, { align:'right' });
+  { const nt = 'N° ' + ficheNum(b); let fs = 9.5; doc.setFont('courier','bold'); doc.setFontSize(fs);
+    while(fs > 6 && doc.getTextWidth(nt) > 105){ fs -= 0.5; doc.setFontSize(fs); }   // n° long : police réduite
+    doc.setTextColor(...INK); doc.text(nt, W - M, y + 13, { align:'right' }); }
   y += 20;
 
   /* client */
@@ -631,10 +634,11 @@ function buildPdf(b){
     if(li < lines.length){ doc.addPage(); y = 14; }
   }
 
-  /* articles : matériel + main d'œuvre + déplacement */
+  /* articles : matériel + main d'œuvre + déplacement + port et emballage */
   const rows = b.materiel.map(m => [m.ref || '-', m.des || '-', String(m.qte || '')]);
   if(b.duree) rows.push(['SER00154', "Main d'œuvre (" + nb + ' intervenant' + (nb > 1 ? 's' : '') + ')', hoursTxt(b.duree * nb)]);
   rows.push(['SER00156', 'Déplacement', String(nb)]);
+  rows.push([PORT.ref, PORT.des, String(PORT.qte)]);   // toujours en dernière ligne
   ensure(20);
   doc.autoTable({ startY: y, margin:{ left:M, right:M }, theme:'grid',
     head: [['Code Article', 'Désignation', 'Qté']], body: rows,
@@ -673,7 +677,7 @@ function buildPdf(b){
   });
   const n = doc.getNumberOfPages();
   for(let i = 1; i <= n; i++){
-    doc.setPage(i); txt('Fiche N° ' + b.numero + '  -  ' + b.client + (b.codeClient ? ' (' + b.codeClient + ')' : ''), M, 292, 7.5, false, MUT);
+    doc.setPage(i); txt('Fiche N° ' + ficheNum(b) + '  -  ' + b.client + (b.codeClient ? ' (' + b.codeClient + ')' : ''), M, 292, 7.5, false, MUT);
     txt('Page ' + i + ' / ' + n, W - M, 292, 7.5, false, MUT, { align:'right' });
   }
   return doc.output('blob');
@@ -686,17 +690,22 @@ const wrap76 = s => s.replace(/(.{76})/g, '$1\r\n');
 function blobB64(blob){ return new Promise(res => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.readAsDataURL(blob); }); }
 /* Nom des fichiers : Département-CodeClient-JJMMAA-Client-Entreprise-Type (le n° du bon reste dans le PDF et le .json) */
 const fnPart = v => String(v || '').replace(/[\\/:*?"<>|\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/^[.\s]+|[.\s]+$/g, '');
-function fileName(b){
+function nameParts(b, withEnt){
   const d = String(b.date || '').split('-'), jjmmaa = d.length === 3 ? d[2] + d[1] + d[0].slice(2) : '';
-  const name = [b.departement, b.codeClient, jjmmaa, String(b.client || '').slice(0, 60), b.entreprise, b.typeInter ? typeSlug(b.typeInter) : '']
+  return [b.departement, b.codeClient, jjmmaa, String(b.client || '').slice(0, 60), withEnt ? b.entreprise : '', b.typeInter ? typeSlug(b.typeInter) : '']
     .map(fnPart).filter(Boolean).join('-');
-  return (name || 'Bon-' + b.numero) + '.pdf';
 }
+function fileName(b){ return (nameParts(b, true) || 'Bon-' + b.numero) + '.pdf'; }
+/* N° imprimé sur la fiche : même format que le fichier, sans le nom du prestataire */
+const ficheNum = b => nameParts(b, false) || b.numero;
+/* forfait port et emballage : toujours en dernière ligne, prix réglé dans la page admin */
+const PORT = { ref:'MOP', des:'Forfait port et emballage', qte:1 };
+const portPrix = () => { const v = Number(String((CONF.portEmballage || {}).prix ?? 32).replace(',', '.')); return isFinite(v) ? v : 32; };
 function dataOf(b){
   const t = b.tech, d = b.duree || 0, n = nbOf(b), h = x => Math.round(x / 60 * 100) / 100;
   return {
     type: 'bon-intervention', version: 1,
-    numero: b.numero, date: b.date, valideLe: new Date(b.validatedAt).toISOString(),
+    numero: b.numero, nomBon: fileName(b).replace(/\.pdf$/, ''), date: b.date, valideLe: new Date(b.validatedAt).toISOString(),
     entreprise: b.entreprise, technicien: (t.prenom + ' ' + t.nom).trim(), initialesTechnicien: t.initiales,
     departement: String(b.departement || '').trim().toUpperCase(), codeClient: String(b.codeClient || '').trim(),
     client: b.client, typeIntervention: b.typeInter || '', site: b.site || '', adresse: b.adresse, contact: b.contact, emailClient: b.clientEmail,
@@ -705,6 +714,8 @@ function dataOf(b){
     arrivee: b.debut, depart: b.fin, pauseMin: Number(b.pause) || 0,
     heuresSurPlace: h(d), nbIntervenants: n, heuresMainOeuvre: h(d * n),
     signataire: b.signNom,
+    portEmballageReference: PORT.ref, portEmballageDesignation: PORT.des, portEmballageQuantite: PORT.qte,
+    portEmballagePrixHT: b.portPrix ?? portPrix(),
     materiel: b.materiel.map(m => ({ reference: String(m.ref || '').trim(), designation: String(m.des || '').trim(), quantite: Number(String(m.qte).replace(',', '.')) || 0 }))
   };
 }
@@ -714,7 +725,7 @@ const bonName = b => fileName(b).replace(/\.pdf$/, '');   // Département-CodeCl
 function subjectOf(b){ return "Bon d'intervention " + bonName(b); }
 function bodyOf(b){
   const t = b.tech, mat = b.materiel.length;
-  return 'Bonjour,\n\nVeuillez trouver ci-joint le bon d’intervention ' + bonName(b) + ' du ' + fmtDate(b.date) + ' (N° ' + b.numero + ').\n\n' +
+  return 'Bonjour,\n\nVeuillez trouver ci-joint le bon d’intervention ' + bonName(b) + ' du ' + fmtDate(b.date) + '.\n\n' +
     'Client : ' + b.client + (b.codeClient ? ' - code ' + b.codeClient : '') + '\n' +
     (b.typeInter ? "Type d'intervention : " + b.typeInter + '\n' : '') +
     'Horaires : ' + b.debut + ' - ' + b.fin + (Number(b.pause) ? ', pause ' + b.pause + ' min' : '') + '\n' +
@@ -753,7 +764,7 @@ function showRecap(num){
   cur = hist().find(b => b.numero === num); if(!cur) return show('form');
   curPdf = null; show('recap');
   const b = cur, {to, cc} = recipients(b), [pc, pl] = pillOf(b);
-  $('#r-num').textContent = b.numero; const p = $('#r-pill'); p.className = 'pill ' + pc; p.textContent = pl;
+  $('#r-num').textContent = ficheNum(b); const p = $('#r-pill'); p.className = 'pill ' + pc; p.textContent = pl;
   const rows = [['Client', b.client], ['Type', b.typeInter || '—'], ['Code client', (b.codeClient || '—') + (b.departement ? ' · dépt ' + b.departement : '')], ['Date', fmtDate(b.date)], ['Horaires', b.debut + ' – ' + b.fin + (Number(b.pause) ? ' (pause ' + b.pause + ' min)' : '')],
     ['Temps passé', fmtDuree(b.duree) + (nbOf(b) > 1 ? ' × ' + nbOf(b) + ' intervenants = ' + fmtDuree(b.duree * nbOf(b)) : '')], ['Matériel', b.materiel.length ? b.materiel.map(m => (m.qte||'') + ' × ' + (m.ref||'') + ' ' + (m.des||'')).join('\n') : 'Aucun'],
     ['Commercial', [b.comPrenom, b.comNom].filter(Boolean).join(' ') || '—'], ['Photos', String(b.photos.length)], ['Entreprise', b.entreprise], ['Signé par', b.signNom]];
@@ -814,7 +825,7 @@ async function archiveBon(b, pdf){
     const payload = JSON.stringify({ v:1, file: fileName(b), data: dataOf(b), pdf: await blobB64(pdf || buildPdf(b)) });
     const sealed = await seal(s.hk, payload), body = sealed.iv + ':' + sealed.data;
     const parts = []; for(let i = 0; i < body.length; i += CHUNK) parts.push(body.slice(i, i + CHUNK));
-    const summary = await seal(s.hk, JSON.stringify({ numero: b.numero, date: b.date, client: b.client, codeClient: b.codeClient, type: b.typeInter || '',
+    const summary = await seal(s.hk, JSON.stringify({ numero: b.numero, nom: ficheNum(b), date: b.date, client: b.client, codeClient: b.codeClient, type: b.typeInter || '',
       tech: (b.tech.prenom + ' ' + b.tech.nom).trim(), entreprise: b.entreprise, validatedAt: b.validatedAt, photos: b.photos.length, parts: parts.length, size: body.length }));
     const rid = bytesB64(crypto.getRandomValues(new Uint8Array(6))).replace(/[+/=]/g, '');
     const old = (hist().find(x => x.numero === b.numero) || {}).archIssue;
@@ -866,11 +877,11 @@ async function loadHistory(){
 }
 function renderHistory(pend){
   const q = $('#h-search').value.trim().toLowerCase();
-  const f = x => !q || [x.numero, x.client, x.type, x.typeInter, x.codeClient].join(' ').toLowerCase().includes(q);
+  const f = x => !q || [x.nom, x.numero, x.client, x.type, x.typeInter, x.codeClient].join(' ').toLowerCase().includes(q);
   const p = (pend || hist().filter(isPending)).filter(f), l = HIST.filter(f);
   $('#h-count').textContent = (l.length + p.length) + ' bon(s)';
-  $('#hist').innerHTML = p.map(b => `<div class="hi"><span class="n">${esc(b.numero)}</span><span class="pill valide">En attente</span><span class="c">${esc(b.client)}</span><span></span><span class="m">${fmtDate(b.date)} · archivage à la prochaine connexion</span></div>`).join('')
-    + l.map(x => `<div class="hi" data-row="${x.issue}"><span class="n">${esc(x.numero)}</span><span class="pill envoye">Archivé</span><span class="c">${esc(x.client)}</span><span></span><span class="m">${fmtDate(x.date)} · ${esc(x.type || '')} · ${x.photos || 0} photo(s)</span><span class="m" style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn small" data-issue="${x.issue}">Récupérer le bon</button></span></div>`).join('')
+  $('#hist').innerHTML = p.map(b => `<div class="hi"><span class="n">${esc(ficheNum(b))}</span><span class="pill valide">En attente</span><span class="c">${esc(b.client)}</span><span></span><span class="m">${fmtDate(b.date)} · archivage à la prochaine connexion</span></div>`).join('')
+    + l.map(x => `<div class="hi" data-row="${x.issue}"><span class="n">${esc(x.nom || x.numero)}</span><span class="pill envoye">Archivé</span><span class="c">${esc(x.client)}</span><span></span><span class="m">${fmtDate(x.date)} · ${esc(x.type || '')} · ${x.photos || 0} photo(s)</span><span class="m" style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn small" data-issue="${x.issue}">Récupérer le bon</button></span></div>`).join('')
     || '<div class="card"><p class="empty">Aucun bon archivé pour l\'instant.</p></div>';
 }
 const OPENED = {};
@@ -966,7 +977,7 @@ $('#f-client').addEventListener('input', e => {
     contact: c.contact || draft.contact, clientEmail: c.email || draft.clientEmail,
     comPrenom: c.comPrenom || '', comNom: c.comNom || '', comEmail: c.comEmail || '' });
   ['codeClient','departement','adresse','contact','clientEmail','comPrenom','comNom','comEmail'].forEach(k => $('#f-' + k).value = draft[k] || '');
-  comHint(); saveDraft(); toast('Client ' + c.nom + ' renseigné.');
+  comHint(); $('#numero').textContent = ficheNum(draft); saveDraft(); toast('Client ' + c.nom + ' renseigné.');
 });
 
 /* ---------- configuration (uniquement par lien) ---------- */
