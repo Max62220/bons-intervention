@@ -10,7 +10,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-eCCTE5P4oRP4Q+a2slS8uZM9A8mJunFiYGJQ16Nw+UY='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://api.github.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-8fQpG45c9qFPnpRQ9ZzRqIKzGpVDjgvEMPLFCEFLAl4='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://api.github.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <style>
 /* polices hébergées dans le dépôt (aucun appel à Google Fonts) — IBM Plex, licence SIL OFL */
 @font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/ibm-plex-sans-latin-400-normal.woff2) format("woff2")}
@@ -769,7 +769,7 @@ function copyText(txt){
   return Promise.resolve(ok);
 }
 
-const APP_VER = 26;
+const APP_VER = 27;
 /* ---------- récap ---------- */
 let cur = null, curPdf = null;
 const canShareFiles = (() => { try { return !!(navigator.canShare && navigator.canShare({ files: [new File(['x'], 'x.pdf', {type:'application/pdf'})] })); } catch(e){ return false; } })();
@@ -925,11 +925,9 @@ $('#hist').addEventListener('click', e => {
 $('#h-search').addEventListener('input', () => renderHistory());
 $('#navHist').onclick = () => { show('history'); loadHistory(); };
 $('#hBack').onclick = () => show('form');
-/* téléphone : un seul appui = adresses copiées + appli e-mail ouverte avec le PDF */
-const allMails = b => { const {to, cc} = recipients(b); return to.concat(cc).join(', '); };
+/* téléphone : appli e-mail ouverte avec le PDF (plus de copie des adresses : elle pouvait bloquer l'ouverture) */
 $('#aShare').onclick = () => {
   if(!curPdf) return; const b = cur;
-  copyText(allMails(b));
   let files = [new File([curPdf], fileName(b), { type:'application/pdf' }), new File([jsonBlob(b)], jsonName(b), { type:'application/json' })];
   try { if(!navigator.canShare({ files })) files = files.slice(0, 1); } catch(e){ files = files.slice(0, 1); }
   navigator.share({ files, title: subjectOf(b), text: bodyOf(b) })
