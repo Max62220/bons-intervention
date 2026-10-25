@@ -1,5 +1,5 @@
 // Cache hors ligne : l'application fonctionne sans réseau après une première ouverture.
-const CACHE = 'bi-v23';
+const CACHE = 'bi-v24';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest', './icon.svg', './logo.png', './icon-192.png', './icon-512.png',
   './lib/jspdf.umd.min.js', './lib/jspdf.plugin.autotable.min.js',

@@ -10,7 +10,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-QtZsJIL7JNNNFuoyAxlRLx3g8g8JEgVqYOtNEW9VE3Q='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://api.github.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-muiNGY4k6ehhiUXwL3MNEfZu/wNkZubnSJU1aqJxHUY='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://api.github.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <style>
 /* polices hébergées dans le dépôt (aucun appel à Google Fonts) — IBM Plex, licence SIL OFL */
 @font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/ibm-plex-sans-latin-400-normal.woff2) format("woff2")}
@@ -757,11 +757,21 @@ function download(blob, name){
   a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(u), 10000);
 }
+/* copie : méthode classique d'abord (immédiate, fiable sur iPhone/Android), puis l'API presse-papiers */
+function copyLegacy(txt){
+  const ta = document.createElement('textarea');
+  ta.value = txt; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;font-size:16px';
+  document.body.appendChild(ta); ta.focus(); ta.select(); ta.setSelectionRange(0, txt.length);
+  let ok = false; try { ok = document.execCommand('copy'); } catch(e){}
+  ta.remove(); return ok;
+}
 function copyText(txt){
-  if(navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(txt).then(() => true, () => false);
-  return Promise.resolve(false);
+  const ok = copyLegacy(txt);
+  if(navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(txt).then(() => true, () => ok);
+  return Promise.resolve(ok);
 }
 
+const APP_VER = 24;
 /* ---------- récap ---------- */
 let cur = null, curPdf = null;
 const canShareFiles = (() => { try { return !!(navigator.canShare && navigator.canShare({ files: [new File(['x'], 'x.pdf', {type:'application/pdf'})] })); } catch(e){ return false; } })();
@@ -779,7 +789,7 @@ function showRecap(num){
   $('#aShare').hidden = !canShareFiles; $('#shareStep').hidden = true;
   $('#aEml').className = canShareFiles ? 'btn' : 'btn primary';
   $('#r-help').textContent = canShareFiles
-    ? "Sur téléphone : « Envoyer » copie les adresses, puis ouvre votre application e-mail avec le PDF joint. Il reste à coller les adresses dans « À »."
+    ? "Sur téléphone : « Envoyer » copie les adresses, puis ouvre votre application e-mail avec le PDF joint. Il reste à coller les adresses dans « À ». (Version " + APP_VER + ")"
     : "Sur ordinateur : le fichier .eml s'ouvre dans Outlook comme un nouveau message avec le PDF déjà joint et les destinataires remplis. Il reste à cliquer sur Envoyer.";
   $('#aSent').hidden = b.statut === 'envoye';
   ['#aShare','#aEml'].forEach(s => $(s).disabled = true);
